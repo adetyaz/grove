@@ -36,5 +36,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-/src/generated/prisma
+# Prisma
+node_modules/.prisma/
 DYNAMIC_INTEGRATION.md

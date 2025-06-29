@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "src/app/api/**/*.js": {
+      "maxDuration": 30
+    }
+  },
+  "build": {
+    "env": {
+      "SKIP_ENV_VALIDATION": "1"
+    }
+  },
+  "installCommand": "npm install && npx prisma generate"
+}

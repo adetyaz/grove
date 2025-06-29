@@ -1,0 +1,12 @@
+# Ignore generated files
+src/generated/
+prisma/generated/
+node_modules/
+
+# Ignore build outputs
+.next/
+out/
+dist/
+
+# Ignore config files that might have different rules
+next.config.mjs

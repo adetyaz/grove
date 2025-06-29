@@ -10,6 +10,8 @@ Note that some details are subject to change as the project progresses and the t
 2. Gamify saving through achievements
 3. Secure funds with inheritance planning
 4. Support each other through gifting
+5. Open to web2 users via social login
+6. Allow invites via email
 
    _All settled on Bitcoin via Citrea's ZK-Rollup_
 
@@ -45,6 +47,7 @@ Set flexible rules:
 
 ### ⚡ Social Integrations
 
+- Social login with Dynamic.xyz
 - Share achievements to Warpcaster/Nostri
 - Farcaster frame for circle stats
 
@@ -115,7 +118,6 @@ Set flexible rules:
 
 1. **Social login** via Google/Email
 2. **Set parameters**:
-
    - Goal amount (BTC/sats)
    - Contribution schedule
    - Withdrawal rules (goal/time/vote)
