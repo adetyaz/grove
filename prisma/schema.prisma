@@ -1,0 +1,74 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  wallet    String   @unique
+  createdAt DateTime @default(now())
+  ownedCircles Circle[] @relation("CircleOwner")
+  memberCircles Circle[] @relation("CircleMembers")
+}
+
+model Circle {
+  id            Int      @id @default(autoincrement())
+  name          String
+  description   String?
+  targetAmount  String   // Stored as string to handle bigint
+  paymentType   String   // "FIXED" or "FLEXIBLE"
+  fixedAmount   String?  // Stored as string to handle bigint
+  deadline      DateTime
+  transactionHash String?
+  owner         User     @relation("CircleOwner", fields: [ownerId], references: [id])
+  ownerId       String
+  members       User[]   @relation("CircleMembers")
+  invites       Invite[] // Legacy invites
+  invitations   CircleInvitation[] // New invitation system
+  onChainId     Int?     // Maps to contract's circleId
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Invite {
+  id        String   @id @default(uuid())
+  circle    Circle   @relation(fields: [circleId], references: [id])
+  circleId  Int
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  claimed   Boolean  @default(false)
+}
+
+model CircleInvitation {
+  id                      String   @id @default(uuid())
+  circleId                Int
+  circle                  Circle   @relation(fields: [circleId], references: [id])
+  inviterEmail            String
+  inviteeEmail            String?  // For email invitations
+  inviteeWalletAddress    String?  // For direct wallet invitations
+  inviteType              String   // "EMAIL" or "WALLET"
+  status                  String   @default("PENDING") // "PENDING", "ACCEPTED", "DECLINED", "EXPIRED"
+  expiresAt               DateTime
+  createdAt               DateTime @default(now())
+  acceptedAt              DateTime?
+  acceptedByEmail         String?
+  acceptedByWalletAddress String?
+  
+  @@index([inviteeEmail])
+  @@index([inviteeWalletAddress])
+  @@index([circleId])
+}
