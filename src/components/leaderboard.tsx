@@ -51,30 +51,7 @@ export default function Leaderboard({
     }
   };
 
-  // Mock data if no entries provided
-  const mockEntries: LeaderboardEntry[] = [
-    {
-      address: userAddress,
-      totalContributed: BigInt("500000000000000000"), // 0.5 ETH
-      circlesCount: 2,
-      rank: 1,
-      isCurrentUser: true,
-    },
-    {
-      address: "0x742f35cc6cf61c7c3bb3e7e5c5f0c6b5e8c9d123",
-      totalContributed: BigInt("300000000000000000"), // 0.3 ETH
-      circlesCount: 1,
-      rank: 2,
-    },
-    {
-      address: "0x456f89ab12cd34ef56gh78ij90kl12mn34op56qr",
-      totalContributed: BigInt("250000000000000000"), // 0.25 ETH
-      circlesCount: 3,
-      rank: 3,
-    },
-  ];
-
-  const displayEntries = entries.length > 0 ? entries : mockEntries;
+  const displayEntries = entries;
 
   return (
     <Card className='bg-gray-800 border-gray-700'>
@@ -85,57 +62,56 @@ export default function Leaderboard({
         </CardTitle>
       </CardHeader>
       <CardContent className='space-y-3'>
-        {displayEntries.map((entry) => (
-          <div
-            key={entry.address}
-            className={`p-4 rounded-lg border bg-gradient-to-r ${
-              entry.isCurrentUser || entry.address === userAddress
-                ? "from-green-500/20 to-green-600/20 border-green-500/40"
-                : getRankColor(entry.rank)
-            }`}
-          >
-            <div className='flex items-center justify-between'>
-              <div className='flex items-center space-x-3'>
-                {getRankIcon(entry.rank)}
-                <div>
-                  <div className='flex items-center space-x-2'>
-                    <span className='font-medium text-white'>
-                      {entry.address === userAddress
-                        ? "You"
-                        : entry.name ||
-                          `${entry.address.slice(0, 6)}...${entry.address.slice(-4)}`}
-                    </span>
-                    {entry.address === userAddress && (
-                      <span className='px-2 py-1 bg-green-500/20 text-green-300 text-xs rounded-full'>
-                        You
+        {displayEntries.length === 0 ? (
+          <div className='text-center py-8'>
+            <TrendingUp className='w-12 h-12 text-gray-600 mx-auto mb-4' />
+            <p className='text-gray-400 mb-2'>No leaderboard data yet</p>
+            <p className='text-sm text-gray-500'>
+              Start contributing to circles to see your ranking!
+            </p>
+          </div>
+        ) : (
+          displayEntries.map((entry) => (
+            <div
+              key={entry.address}
+              className={`p-4 rounded-lg border bg-gradient-to-r ${
+                entry.isCurrentUser || entry.address === userAddress
+                  ? "from-green-500/20 to-green-600/20 border-green-500/40"
+                  : getRankColor(entry.rank)
+              }`}
+            >
+              <div className='flex items-center justify-between'>
+                <div className='flex items-center space-x-3'>
+                  {getRankIcon(entry.rank)}
+                  <div>
+                    <div className='flex items-center space-x-2'>
+                      <span className='font-medium text-white'>
+                        {entry.address === userAddress
+                          ? "You"
+                          : entry.name ||
+                            `${entry.address.slice(0, 6)}...${entry.address.slice(-4)}`}
                       </span>
-                    )}
-                  </div>
-                  <div className='text-sm text-gray-400'>
-                    {entry.circlesCount} circle
-                    {entry.circlesCount !== 1 ? "s" : ""}
+                      {entry.address === userAddress && (
+                        <span className='px-2 py-1 bg-green-500/20 text-green-300 text-xs rounded-full'>
+                          You
+                        </span>
+                      )}
+                    </div>
+                    <div className='text-sm text-gray-400'>
+                      {entry.circlesCount} circle
+                      {entry.circlesCount !== 1 ? "s" : ""}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className='text-right'>
-                <div className='font-bold text-white'>
-                  {formatBTCAmount(entry.totalContributed)}
+                <div className='text-right'>
+                  <div className='font-bold text-white'>
+                    {formatBTCAmount(entry.totalContributed)}
+                  </div>
+                  <div className='text-xs text-gray-400'>Total contributed</div>
                 </div>
-                <div className='text-xs text-gray-400'>Total contributed</div>
               </div>
             </div>
-          </div>
-        ))}
-
-        {entries.length === 0 && (
-          <div className='text-center py-4'>
-            <p className='text-gray-400 text-sm mb-2'>
-              This is a preview of the leaderboard.
-            </p>
-            <p className='text-xs text-gray-500'>
-              Real rankings will be calculated from on-chain contributions.
-            </p>
-          </div>
+          ))
         )}
       </CardContent>
     </Card>

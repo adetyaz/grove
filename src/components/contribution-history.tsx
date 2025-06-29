@@ -16,33 +16,7 @@ export default function ContributionHistory({
 }: {
   contributions?: Contribution[];
 }) {
-  // Mock contributions for now - this will be replaced with real blockchain data
-  const mockContributions: Contribution[] = [
-    {
-      id: "1",
-      contributor: "0x742d35Cc6634C0532925a3b8D33AA6183EDf77AE",
-      amount: "0.001",
-      timestamp: "2024-01-15T10:30:00Z",
-      txHash: "0x1234567890abcdef",
-    },
-    {
-      id: "2",
-      contributor: "0x8ba1f109551bD432803012645Hac136c22C10F7E",
-      amount: "0.002",
-      timestamp: "2024-01-14T15:45:00Z",
-      txHash: "0xabcdef1234567890",
-    },
-    {
-      id: "3",
-      contributor: "0x742d35Cc6634C0532925a3b8D33AA6183EDf77AE",
-      amount: "0.0015",
-      timestamp: "2024-01-13T09:20:00Z",
-      txHash: "0x567890abcdef1234",
-    },
-  ];
-
-  const displayContributions =
-    contributions.length > 0 ? contributions : mockContributions;
+  const displayContributions = contributions;
 
   const formatAddress = (address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;

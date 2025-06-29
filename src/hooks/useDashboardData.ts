@@ -90,14 +90,17 @@ export function useDashboardData() {
             })
           );
 
-          // TODO: Fetch current amounts from blockchain for each circle
-          // For now, using mock data but this should read from contract
-          const enhancedCircles = dbCircles.map((circle) => ({
-            ...circle,
-            currentAmount: BigInt(
-              Math.floor(Math.random() * Number(circle.targetAmount))
-            ),
-          }));
+          // Calculate current amounts from blockchain for each circle
+          const enhancedCircles = await Promise.all(
+            dbCircles.map(async (circle) => {
+              // TODO: Read actual current amount from contract
+              // For now, set to 0 until we implement proper contract reading
+              return {
+                ...circle,
+                currentAmount: BigInt(0),
+              };
+            })
+          );
 
           // Calculate stats
           const totalSaved = enhancedCircles.reduce(
@@ -112,7 +115,7 @@ export function useDashboardData() {
             totalCircles: enhancedCircles.length,
             totalSaved,
             goalsReached,
-            currentStreak: 0, // TODO: Implement streak calculation
+            currentStreak: 0, // TODO: Implement streak calculation from blockchain
             circles: enhancedCircles,
           });
         } else {
