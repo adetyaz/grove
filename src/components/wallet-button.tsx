@@ -126,7 +126,7 @@ export default function WalletButton({
               </button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>{copied ? "Address copied!" : "Copy address"}</p>
+              <p>{copied ? "Address copied!" : "Click to copy address"}</p>
             </TooltipContent>
           </Tooltip>
 
