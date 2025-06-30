@@ -22,12 +22,11 @@ const config = createConfig({
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 10, // 10 minutes - longer cache
-      gcTime: 1000 * 60 * 15, // 15 minutes (replaces deprecated cacheTime)
-      retry: 2,
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-      refetchOnWindowFocus: false, // Reduce unnecessary refetches
-      refetchOnMount: false, // Only refetch if data is stale
+      staleTime: 1000 * 60 * 5, // 5 minutes - reduced from 10
+      gcTime: 1000 * 60 * 10, // 10 minutes - reduced from 15
+      retry: 1, // Reduced retries to avoid connection issues
+      refetchOnWindowFocus: true, // Re-enable for wallet state updates
+      refetchOnMount: true, // Re-enable for wallet state updates
     },
     mutations: {
       retry: 1,

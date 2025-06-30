@@ -79,13 +79,11 @@ export default function Home() {
                 variant='ghost'
                 className='hidden lg:inline-flex text-white'
               />
-              <Link href='/dashboard'>
-                <Button
-                  variant='ghost'
-                  className='hidden lg:inline-flex text-white'
-                >
-                  Dashboard
-                </Button>
+              <Link
+                href='/dashboard'
+                className='hidden lg:inline-flex text-gray-300 hover:text-white transition-colors'
+              >
+                Dashboard
               </Link>
               <Link href='/create'>
                 <Button className='bg-orange-500 hover:bg-orange-600 text-white'>

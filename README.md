@@ -50,6 +50,7 @@ Set flexible rules:
 - Social login with Dynamic.xyz
 - Share achievements to Warpcaster/Nostri
 - Farcaster frame for circle stats
+- Connection with crypto wallets like metamask (coming soon)
 
 ### **Detailed Feature Breakdown**
 
@@ -171,7 +172,7 @@ Base Layer:
 
 Dynamic → Citrea:
 
-- Users sign up via Google/email
+- Users sign up via Google/email/farcaster
 - Dynamic auto-generates Citrea-compatible EOA
 - First 5 transactions gas-sponsored
 
