@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useAccount } from "wagmi";
+import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -52,7 +52,7 @@ interface CircleData {
 export default function CircleDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { address, isConnected } = useAccount();
+  const { user, primaryWallet } = useDynamicConnection();
   const [circle, setCircle] = useState<CircleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +63,10 @@ export default function CircleDetailPage() {
   >("overview");
 
   const circleId = params.id as string;
+
+  // Only allow access when we have a confirmed wallet address
+  const isConnected = !!(user && primaryWallet?.address);
+  const address = primaryWallet?.address;
 
   useEffect(() => {
     if (!isConnected) {

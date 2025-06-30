@@ -4,6 +4,7 @@ import "./globals.css";
 import "react-toastify/dist/ReactToastify.css";
 import DynamicWagmiProvider from "@/providers/DynamicWagmiProvider";
 import DynamicErrorBoundary from "@/components/dynamic-error-boundary";
+import PerformanceMonitor from "@/components/performance-monitor";
 import { ToastContainer } from "react-toastify";
 
 const geistSans = localFont({
@@ -32,6 +33,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <PerformanceMonitor />
         <DynamicErrorBoundary>
           <DynamicWagmiProvider>{children}</DynamicWagmiProvider>
         </DynamicErrorBoundary>

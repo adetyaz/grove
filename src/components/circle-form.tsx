@@ -1,13 +1,16 @@
 "use client";
 import {
-  useAccount,
   useWriteContract,
   useWaitForTransactionReceipt,
+  useAccount,
+  useSwitchChain,
 } from "wagmi";
+import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import {
   GROVE_ABI,
   GROVE_CONTRACT_ADDRESS,
   PaymentType,
+  CITREA_TESTNET,
 } from "@/contracts/constants";
 import { useState, useEffect } from "react";
 import { parseEther } from "viem";
@@ -18,7 +21,15 @@ interface CircleFormProps {
 }
 
 export default function CircleForm({ onSuccess }: CircleFormProps) {
-  const { address, isConnected } = useAccount();
+  const { user, primaryWallet } = useDynamicConnection();
+  const { chain } = useAccount();
+  const { switchChain } = useSwitchChain();
+  const address = primaryWallet?.address;
+  const isConnected = !!(user && primaryWallet?.address);
+
+  // Check if user is on the correct network
+  const isOnCorrectNetwork = chain?.id === CITREA_TESTNET.id;
+
   const {
     writeContract,
     data: hash,
@@ -49,6 +60,16 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
         try {
           groveToast.circleCreated(formData.name);
 
+          // Get transaction receipt to extract circle ID from events
+          const receipt = await fetch(`/api/transaction/${hash}`);
+          let onChainId = undefined;
+
+          if (receipt.ok) {
+            const receiptData = await receipt.json();
+            // Extract circle ID from transaction logs if available
+            onChainId = receiptData.circleId;
+          }
+
           // Store circle data in database
           const targetAmountWei = parseEther(formData.targetAmount);
           const fixedAmountWei = formData.fixedAmount
@@ -57,6 +78,13 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
           const deadlineTimestamp = BigInt(
             Math.floor(new Date(formData.deadline).getTime() / 1000)
           );
+
+          console.log("Storing circle data:", {
+            name: formData.name,
+            targetAmount: targetAmountWei.toString(),
+            transactionHash: hash,
+            onChainId,
+          });
 
           const response = await fetch("/api/circles", {
             method: "POST",
@@ -71,21 +99,34 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
               fixedAmount: fixedAmountWei.toString(),
               deadline: deadlineTimestamp.toString(),
               transactionHash: hash,
+              onChainId,
               ownerWallet: address,
               ownerEmail: `${address}@grove.temp`, // Temporary email
             }),
           });
 
           if (!response.ok) {
-            console.error("Failed to store circle data");
+            if (process.env.NODE_ENV === "development") {
+              console.error("Failed to store circle data");
+            }
             groveToast.warning(
               "Circle created on-chain but failed to store locally"
             );
           } else {
+            await response.json();
             groveToast.success("Circle data stored successfully!");
+
+            // Trigger onSuccess callback to redirect to dashboard
+            if (onSuccess) {
+              setTimeout(() => {
+                onSuccess();
+              }, 1000);
+            }
           }
         } catch (error) {
-          console.error("Error storing circle data:", error);
+          if (process.env.NODE_ENV === "development") {
+            console.error("Error storing circle data:", error);
+          }
           groveToast.warning(
             "Circle created on-chain but failed to store locally"
           );
@@ -142,6 +183,11 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
       return;
     }
 
+    if (!isOnCorrectNetwork) {
+      groveToast.error("Please switch to Citrea Testnet to create circles");
+      return;
+    }
+
     try {
       const targetAmountWei = parseEther(formData.targetAmount);
       const fixedAmountWei = formData.fixedAmount
@@ -174,15 +220,8 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
 
       console.log("Creating circle with params:", {
         name: formData.name,
-        description: formData.description,
         targetAmount: targetAmountWei.toString(),
-        paymentType: formData.paymentType,
-        fixedAmount: fixedAmountWei.toString(),
-        deadline: deadlineTimestamp.toString(),
       });
-
-      console.log("Wallet connected:", isConnected, "Address:", address);
-      console.log("Grove contract address:", GROVE_CONTRACT_ADDRESS);
 
       // Make sure user is on the correct network
       console.log("About to call writeContract...");
@@ -201,7 +240,9 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
 
       // Reset form on success (will happen in useEffect when transaction confirms)
     } catch (error) {
-      console.error("Error creating circle:", error);
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error creating circle:", error);
+      }
       groveToast.error(
         "Failed to create circle. Please check your wallet and try again."
       );
@@ -210,6 +251,29 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
 
   return (
     <div className='space-y-6'>
+      {/* Network Check */}
+      {isConnected && !isOnCorrectNetwork && (
+        <div className='bg-orange-500/20 border border-orange-500/30 rounded-lg p-4'>
+          <div className='flex items-center justify-between'>
+            <div>
+              <h3 className='text-sm font-medium text-orange-200'>
+                Switch to Citrea Testnet
+              </h3>
+              <p className='text-xs text-orange-300 mt-1'>
+                Grove circles are created on Citrea testnet. Please switch your
+                network to continue.
+              </p>
+            </div>
+            <button
+              onClick={() => switchChain({ chainId: CITREA_TESTNET.id })}
+              className='px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white text-sm rounded transition-colors'
+            >
+              Switch Network
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className='grid gap-6'>
         <div>
           <label className='block text-sm font-medium text-white mb-2'>
@@ -376,6 +440,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
             isPending ||
             isConfirming ||
             !isConnected ||
+            !isOnCorrectNetwork ||
             !formData.name ||
             !formData.targetAmount ||
             !formData.deadline ||

@@ -1,7 +1,7 @@
 "use client";
-import { useAccount } from "wagmi";
+import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,37 +21,47 @@ import {
 } from "lucide-react";
 
 export default function DashboardPage() {
-  const { address, isConnected } = useAccount();
+  const { user, primaryWallet } = useDynamicConnection();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
   const { dashboardData, loading } = useDashboardData();
 
+  // Memoize connection state
+  const connectionState = useMemo(
+    () => ({
+      isConnected: !!(user && primaryWallet?.address),
+      address: primaryWallet?.address,
+    }),
+    [user, primaryWallet?.address]
+  );
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Redirect to home if not connected
+  // Redirect to home if not connected - use memoized state
   useEffect(() => {
-    if (mounted && !isConnected) {
+    if (mounted && !connectionState.isConnected) {
       router.push("/");
     }
-  }, [mounted, isConnected, router]);
+  }, [mounted, connectionState.isConnected, router]);
 
-  const handleCopyAddress = () => {
-    if (address) {
-      navigator.clipboard.writeText(address);
+  // Memoize the copy handler to prevent re-renders
+  const handleCopyAddress = useCallback(() => {
+    if (connectionState.address) {
+      navigator.clipboard.writeText(connectionState.address);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
-  };
+  }, [connectionState.address]);
 
   // Prevent hydration mismatch
   if (!mounted) {
     return null;
   }
 
-  if (!isConnected) {
+  if (!connectionState.isConnected) {
     return null;
   }
 
@@ -109,7 +119,8 @@ export default function DashboardPage() {
                     <span className='text-green-400'>Copied!</span>
                   ) : (
                     <>
-                      {address?.slice(0, 6)}...{address?.slice(-4)}
+                      {connectionState.address?.slice(0, 6)}...
+                      {connectionState.address?.slice(-4)}
                     </>
                   )}
                 </button>
@@ -241,7 +252,7 @@ export default function DashboardPage() {
                     <CircleCard
                       key={circle.id}
                       circle={circle}
-                      userAddress={address!}
+                      userAddress={connectionState.address!}
                     />
                   ))}
                 </div>
@@ -319,7 +330,7 @@ export default function DashboardPage() {
             </Card>
 
             {/* Leaderboard */}
-            <Leaderboard entries={[]} userAddress={address!} />
+            <Leaderboard entries={[]} userAddress={connectionState.address!} />
 
             {/* Grove Status */}
             <Card className='bg-gradient-to-br from-green-500/20 to-green-600/20 border-green-500/30'>

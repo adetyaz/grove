@@ -1,13 +1,16 @@
 "use client";
-import { useAccount } from "wagmi";
+import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { useRouter } from "next/navigation";
 import CircleForm from "@/components/circle-form";
 import WalletButton from "@/components/wallet-button";
 import { groveToast } from "@/lib/toast";
 
 export default function CreateCircle() {
-  const { isConnected } = useAccount();
+  const { user, primaryWallet } = useDynamicConnection();
   const router = useRouter();
+
+  // Only allow access when we have a confirmed wallet address
+  const isConnected = !!(user && primaryWallet?.address);
 
   const handleSuccess = () => {
     groveToast.success(

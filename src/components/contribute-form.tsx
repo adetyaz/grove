@@ -1,10 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import {
-  useAccount,
-  useWriteContract,
-  useWaitForTransactionReceipt,
-} from "wagmi";
+import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { parseEther } from "viem";
 import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/contracts/constants";
 import { groveToast } from "@/lib/toast";
@@ -24,7 +21,8 @@ export default function ContributeForm({
 }: ContributeFormProps) {
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { address } = useAccount();
+  const { primaryWallet } = useDynamicConnection();
+  const address = primaryWallet?.address;
 
   const { writeContract, data: hash, error, isPending } = useWriteContract();
 

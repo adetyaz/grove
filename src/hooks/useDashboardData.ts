@@ -1,7 +1,8 @@
 "use client";
-import { useAccount, useReadContract } from "wagmi";
+import { useReadContract } from "wagmi";
+import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/contracts/constants";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { formatEther } from "viem";
 
 interface Circle {
@@ -26,7 +27,10 @@ interface DashboardStats {
 }
 
 export function useDashboardData() {
-  const { address, isConnected } = useAccount();
+  const { user, primaryWallet } = useDynamicConnection();
+  const address = primaryWallet?.address;
+  const isConnected = !!(user && primaryWallet?.address);
+
   const [dashboardData, setDashboardData] = useState<DashboardStats>({
     totalCircles: 0,
     totalSaved: BigInt(0),
@@ -44,121 +48,86 @@ export function useDashboardData() {
     args: address ? [address] : undefined,
     query: {
       enabled: !!address && isConnected,
+      staleTime: 1000 * 60 * 5, // 5 minutes cache
+      refetchOnWindowFocus: false,
     },
   });
 
-  useEffect(() => {
-    const fetchCircleDetails = async () => {
-      if (!address) return;
+  // Memoize the fetch function to prevent unnecessary re-renders
+  const fetchCircleDetails = useCallback(async () => {
+    if (!address) return;
 
-      setLoading(true);
-      try {
-        // Fetch circles from database first (faster and more reliable)
-        const dbResponse = await fetch(`/api/circles?userWallet=${address}`);
-        const dbData = await dbResponse.json();
+    setLoading(true);
+    try {
+      // Use AbortController to cancel requests if component unmounts
+      const controller = new AbortController();
 
-        if (dbData.circles && dbData.circles.length > 0) {
-          // Map database circles to our Circle interface
-          const dbCircles: Circle[] = dbData.circles.map(
-            (circle: {
-              id: number;
-              onChainId?: number;
-              name: string;
-              description?: string;
-              targetAmount: string;
-              deadline: string;
-              owner: { wallet: string };
-              members: Array<{ wallet: string }>;
-              invitations: Array<unknown>;
-            }) => ({
+      // Fetch circles from database first (faster and more reliable)
+      const dbResponse = await fetch(`/api/circles?userWallet=${address}`, {
+        signal: controller.signal,
+      });
+
+      if (!dbResponse.ok) {
+        throw new Error(`HTTP error! status: ${dbResponse.status}`);
+      }
+
+      const dbData = await dbResponse.json();
+
+      if (dbData.circles && dbData.circles.length > 0) {
+        // Map database circles to our Circle interface - optimize by avoiding repeated operations
+        const dbCircles: Circle[] = dbData.circles.map(
+          (circle: {
+            id: number;
+            onChainId?: number;
+            name: string;
+            description?: string;
+            targetAmount: string;
+            deadline: string;
+            owner: { wallet: string };
+            members: Array<{ wallet: string }>;
+            invitations: Array<unknown>;
+          }) => {
+            const targetAmount = BigInt(circle.targetAmount);
+            const deadline = BigInt(
+              Math.floor(new Date(circle.deadline).getTime() / 1000)
+            );
+            const memberWallets = circle.members.map((m) => m.wallet);
+            const allMembers = [circle.owner.wallet, ...memberWallets];
+
+            return {
               id: circle.onChainId || circle.id,
               name: circle.name,
               description: circle.description,
-              targetAmount: BigInt(circle.targetAmount),
-              currentAmount: BigInt("0"), // Will be fetched from blockchain later
-              deadline: BigInt(
-                Math.floor(new Date(circle.deadline).getTime() / 1000)
-              ),
+              targetAmount,
+              currentAmount: BigInt("0"), // Will be fetched from blockchain later if needed
+              deadline,
               isActive: true,
-              memberCount:
-                circle.members.length + circle.invitations.length + 1, // owner + members + accepted invites
-              members: [
-                circle.owner.wallet,
-                ...circle.members.map((m) => m.wallet),
-              ],
+              memberCount: allMembers.length + circle.invitations.length,
+              members: allMembers,
               creator: circle.owner.wallet,
-            })
-          );
-
-          // Calculate current amounts from blockchain for each circle
-          const enhancedCircles = await Promise.all(
-            dbCircles.map(async (circle) => {
-              // TODO: Read actual current amount from contract
-              // For now, set to 0 until we implement proper contract reading
-              return {
-                ...circle,
-                currentAmount: BigInt(0),
-              };
-            })
-          );
-
-          // Calculate stats
-          const totalSaved = enhancedCircles.reduce(
-            (sum, circle) => sum + circle.currentAmount,
-            BigInt(0)
-          );
-          const goalsReached = enhancedCircles.filter(
-            (circle) => circle.currentAmount >= circle.targetAmount
-          ).length;
-
-          setDashboardData({
-            totalCircles: enhancedCircles.length,
-            totalSaved,
-            goalsReached,
-            currentStreak: 0, // TODO: Implement streak calculation from blockchain
-            circles: enhancedCircles,
-          });
-        } else {
-          // Fallback to blockchain-only data if no DB records
-          if (userCircleIds && Array.isArray(userCircleIds)) {
-            const circlePromises = userCircleIds.map(async (id: bigint) => {
-              // Mock circle data since we don't have full blockchain reads implemented
-              return {
-                id: Number(id),
-                name: `Circle #${id}`,
-                description: "A collaborative savings circle",
-                targetAmount: BigInt("1000000000000000000"), // 1 BTC
-                currentAmount: BigInt("250000000000000000"), // 0.25 BTC
-                deadline: BigInt(Math.floor(Date.now() / 1000) + 86400 * 30),
-                isActive: true,
-                memberCount: 1,
-                members: [address],
-                creator: address,
-              } as Circle;
-            });
-
-            const blockchainCircles = await Promise.all(circlePromises);
-
-            const totalSaved = blockchainCircles.reduce(
-              (sum, circle) => sum + circle.currentAmount,
-              BigInt(0)
-            );
-            const goalsReached = blockchainCircles.filter(
-              (circle) => circle.currentAmount >= circle.targetAmount
-            ).length;
-
-            setDashboardData({
-              totalCircles: blockchainCircles.length,
-              totalSaved,
-              goalsReached,
-              currentStreak: 0,
-              circles: blockchainCircles,
-            });
+            };
           }
-        }
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-        // Set empty state on error
+        );
+
+        // Calculate stats efficiently
+        const totalCircles = dbCircles.length;
+        const totalSaved = dbCircles.reduce(
+          (sum, circle) => sum + circle.currentAmount,
+          BigInt(0)
+        );
+        const goalsReached = dbCircles.filter(
+          (circle) => circle.currentAmount >= circle.targetAmount
+        ).length;
+
+        setDashboardData({
+          totalCircles,
+          totalSaved,
+          goalsReached,
+          currentStreak: 0, // TODO: Implement streak calculation
+          circles: dbCircles,
+        });
+      } else {
+        // Empty state when no circles found
         setDashboardData({
           totalCircles: 0,
           totalSaved: BigInt(0),
@@ -166,22 +135,44 @@ export function useDashboardData() {
           currentStreak: 0,
           circles: [],
         });
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (error) {
+      // Only log errors in development
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error fetching dashboard data:", error);
+      }
 
-    fetchCircleDetails();
-  }, [userCircleIds, address]);
+      // Set empty state on error
+      setDashboardData({
+        totalCircles: 0,
+        totalSaved: BigInt(0),
+        goalsReached: 0,
+        currentStreak: 0,
+        circles: [],
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [address]);
 
-  return {
-    dashboardData,
-    loading: loadingIds || loading,
-    refresh: () => {
-      // Trigger a refresh by re-fetching data
-      // This would typically refetch the contracts
-    },
-  };
+  // Only re-fetch when address changes or userCircleIds changes
+  useEffect(() => {
+    if (address) {
+      fetchCircleDetails();
+    }
+  }, [address, userCircleIds, fetchCircleDetails]);
+
+  // Memoize the return value to prevent unnecessary re-renders
+  const memoizedData = useMemo(
+    () => ({
+      dashboardData,
+      loading: loadingIds || loading,
+      refresh: fetchCircleDetails,
+    }),
+    [dashboardData, loadingIds, loading, fetchCircleDetails]
+  );
+
+  return memoizedData;
 }
 
 // Helper functions for formatting

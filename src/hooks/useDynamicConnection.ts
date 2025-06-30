@@ -1,6 +1,6 @@
 "use client";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 export function useDynamicConnection() {
   const { setShowAuthFlow, user, primaryWallet, handleLogOut } =
@@ -9,59 +9,134 @@ export function useDynamicConnection() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
 
-  // Reset connecting state when user changes
+  // Use refs to prevent memory leaks from timeouts
+  const connectionTimeoutRef = useRef<NodeJS.Timeout>();
+  const cleanupTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (connectionTimeoutRef.current) {
+        clearTimeout(connectionTimeoutRef.current);
+      }
+      if (cleanupTimeoutRef.current) {
+        clearTimeout(cleanupTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Minimal logging - only for critical state changes
+  useEffect(() => {
+    // Only log when there's a meaningful change and only in development
+    if (process.env.NODE_ENV === "development") {
+      if (user && primaryWallet?.address) {
+        console.log(
+          "✅ Wallet connected:",
+          primaryWallet.address.slice(0, 6) + "..."
+        );
+      } else if (!user && !primaryWallet) {
+        console.log("❌ Wallet disconnected");
+      }
+    }
+
+    // Handle inconsistent state: wallet present but no user
+    if (primaryWallet && !user) {
+      console.warn("Inconsistent state detected - cleaning up");
+      handleLogOut().catch(() => {
+        // Silent error handling
+      });
+    }
+  }, [user, primaryWallet, handleLogOut]); // Fixed dependencies
+
+  // Reset connecting state when connection succeeds
   useEffect(() => {
     if (user && primaryWallet) {
       setIsConnecting(false);
+      if (connectionTimeoutRef.current) {
+        clearTimeout(connectionTimeoutRef.current);
+        connectionTimeoutRef.current = undefined;
+      }
     }
-  }, [user, primaryWallet]);
+  }, [user, primaryWallet]); // Fixed dependencies
 
-  // Reset disconnecting state when user is fully logged out
+  // Reset disconnecting state when disconnection completes
   useEffect(() => {
     if (!user && !primaryWallet) {
       setIsDisconnecting(false);
     }
   }, [user, primaryWallet]);
-  const connect = async () => {
-    if (isConnecting || (user && primaryWallet)) return;
 
-    setIsConnecting(true);
-    try {
-      // Add a small delay to ensure Dynamic is fully initialized
-      await new Promise((resolve) => setTimeout(resolve, 100));
+  // Memoized reset function
+  const resetConnectionState = useCallback(() => {
+    setIsConnecting(false);
+    setIsDisconnecting(false);
+    if (connectionTimeoutRef.current) {
+      clearTimeout(connectionTimeoutRef.current);
+      connectionTimeoutRef.current = undefined;
+    }
+  }, []);
 
-      // Force show the auth flow
-      setShowAuthFlow(true);
-    } catch (error) {
-      console.error("Error connecting wallet:", error);
-      setIsConnecting(false);
+  const connect = useCallback(async () => {
+    // Check if already properly connected
+    if (user && primaryWallet) {
+      return;
+    }
 
-      // Show user-friendly error message
-      if (error instanceof Error && error.message.includes("mobile provider")) {
-        alert(
-          "Please make sure you have a compatible wallet installed (like MetaMask) or try using WalletConnect for mobile wallets."
-        );
-      } else {
-        alert("Failed to connect wallet. Please try again.");
+    // If currently connecting, don't start another connection
+    if (isConnecting) {
+      return;
+    }
+
+    // If there's a wallet but no user (inconsistent state), clean up first
+    if (primaryWallet && !user) {
+      try {
+        await handleLogOut();
+        // Small delay for cleanup
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      } catch (error) {
+        // Silent error handling in production
+        if (process.env.NODE_ENV === "development") {
+          console.error("Error cleaning up state:", error);
+        }
       }
     }
-  };
 
-  const disconnect = async () => {
+    setIsConnecting(true);
+
+    try {
+      setShowAuthFlow(true);
+
+      // Set timeout with ref to prevent memory leaks
+      connectionTimeoutRef.current = setTimeout(() => {
+        if (!user || !primaryWallet) {
+          setIsConnecting(false);
+        }
+      }, 15000); // 15 second timeout
+    } catch (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error in connect function:", error);
+      }
+      setIsConnecting(false);
+    }
+  }, [user, primaryWallet, isConnecting, setShowAuthFlow, handleLogOut]);
+
+  const disconnect = useCallback(async () => {
     if (isDisconnecting || (!user && !primaryWallet)) return;
 
     setIsDisconnecting(true);
     try {
       await handleLogOut();
       // Small delay to ensure state cleanup
-      setTimeout(() => {
+      cleanupTimeoutRef.current = setTimeout(() => {
         setIsDisconnecting(false);
       }, 100);
     } catch (error) {
-      console.error("Error disconnecting wallet:", error);
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error disconnecting wallet:", error);
+      }
       setIsDisconnecting(false);
     }
-  };
+  }, [isDisconnecting, user, primaryWallet, handleLogOut]);
 
   return {
     user,
@@ -71,5 +146,6 @@ export function useDynamicConnection() {
     isDisconnecting,
     connect,
     disconnect,
+    resetConnectionState,
   };
 }

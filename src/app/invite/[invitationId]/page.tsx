@@ -1,11 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import {
-  useAccount,
-  useWriteContract,
-  useWaitForTransactionReceipt,
-} from "wagmi";
+import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import WalletButton from "@/components/wallet-button";
@@ -40,7 +37,10 @@ interface InvitationData {
 
 export default function InvitePage() {
   const params = useParams();
-  const { address, isConnected } = useAccount();
+  const { user, primaryWallet } = useDynamicConnection();
+  const address = primaryWallet?.address;
+  const isConnected = !!(user && primaryWallet?.address);
+
   const {
     writeContract,
     data: hash,

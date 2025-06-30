@@ -1,13 +1,17 @@
 "use client";
-import { useAccount } from "wagmi";
+import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { useEffect, useState } from "react";
 import CircleDashboard from "./circle-dashboard";
 import { groveToast } from "@/lib/toast";
 
 export default function ConnectedUserSection() {
-  const { address, isConnected } = useAccount();
+  const { user, primaryWallet } = useDynamicConnection();
   const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Only show when we have a confirmed wallet address
+  const isConnected = !!(user && primaryWallet?.address);
+  const address = primaryWallet?.address;
 
   useEffect(() => {
     setMounted(true);

@@ -5,12 +5,40 @@ import { Card, CardContent } from "@/components/ui/card";
 import ConnectedUserSection from "@/components/connected-user-section";
 import WalletButton from "@/components/wallet-button";
 import { Shield, Users, Star, Menu, Target, Zap, Globe } from "lucide-react";
-import { useAccount } from "wagmi";
-import { useState, useEffect } from "react";
+import { useDynamicConnection } from "@/hooks/useDynamicConnection";
+import { useState, useEffect, useMemo } from "react";
 
 export default function Home() {
-  const { isConnected } = useAccount();
+  const { user, primaryWallet, isConnecting } = useDynamicConnection();
   const [mounted, setMounted] = useState(false);
+
+  // Memoize connection state to prevent unnecessary re-renders
+  const connectionState = useMemo(
+    () => ({
+      isConnected: !!(user && primaryWallet && primaryWallet.address),
+      hasAddress: !!primaryWallet?.address,
+      isConnecting,
+    }),
+    [user, primaryWallet, isConnecting]
+  );
+
+  // Only log in development and when connection state actually changes
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development" && mounted) {
+      // Only log meaningful changes
+      const logKey = `${connectionState.isConnected}-${connectionState.isConnecting}`;
+      const lastLogKey = sessionStorage.getItem("lastHomeLogKey");
+
+      if (logKey !== lastLogKey) {
+        console.log("Homepage state:", {
+          isConnected: connectionState.isConnected,
+          hasAddress: connectionState.hasAddress,
+          isConnecting: connectionState.isConnecting,
+        });
+        sessionStorage.setItem("lastHomeLogKey", logKey);
+      }
+    }
+  }, [connectionState, mounted]);
 
   useEffect(() => {
     setMounted(true);
@@ -45,7 +73,7 @@ export default function Home() {
           </nav>
         </div>
         <div className='flex items-center space-x-4'>
-          {isConnected ? (
+          {connectionState.isConnected ? (
             <>
               <WalletButton
                 variant='ghost'
@@ -71,7 +99,9 @@ export default function Home() {
                 variant='ghost'
                 className='hidden lg:inline-flex text-white'
               >
-                Connect Wallet
+                {connectionState.isConnecting
+                  ? "Connecting..."
+                  : "Connect Wallet"}
               </WalletButton>
               <Link href='/create'>
                 <Button className='bg-orange-500 hover:bg-orange-600 text-white'>

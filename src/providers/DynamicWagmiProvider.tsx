@@ -5,29 +5,31 @@ import { DynamicWagmiConnector } from "@dynamic-labs/wagmi-connector";
 import { createConfig, WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http } from "viem";
-import { mainnet, sepolia, polygon, arbitrum } from "viem/chains";
 import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
 import { CITREA_TESTNET } from "@/contracts/constants";
 
-// Configure Wagmi
+// Configure Wagmi with primary focus on Citrea testnet
 const config = createConfig({
-  chains: [CITREA_TESTNET, mainnet, sepolia, polygon, arbitrum],
+  chains: [CITREA_TESTNET], // Only Citrea for simplicity
   multiInjectedProviderDiscovery: false,
   transports: {
     [CITREA_TESTNET.id]: http(),
-    [mainnet.id]: http(),
-    [sepolia.id]: http(),
-    [polygon.id]: http(),
-    [arbitrum.id]: http(),
   },
   ssr: false, // Disable SSR to prevent hydration issues
 });
 
-// Create React Query client
+// Create React Query client with optimized settings
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      staleTime: 1000 * 60 * 10, // 10 minutes - longer cache
+      gcTime: 1000 * 60 * 15, // 15 minutes (replaces deprecated cacheTime)
+      retry: 2,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      refetchOnWindowFocus: false, // Reduce unnecessary refetches
+      refetchOnMount: false, // Only refetch if data is stale
+    },
+    mutations: {
       retry: 1,
     },
   },
@@ -46,23 +48,44 @@ export default function DynamicWagmiProvider({
         environmentId: process.env.NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID!,
         walletConnectors: [EthereumWalletConnectors],
 
-        // Optional: Additional configuration
+        // Simplified configuration for better MetaMask compatibility
+        initialAuthenticationMode: "connect-only",
+
+        // App branding
+        appName: "Grove",
+        appLogoUrl: "/favicon.ico",
+
+        // CSS overrides for better UI
         cssOverrides: `
           .dynamic-modal {
             z-index: 9999;
           }
         `,
-        initialAuthenticationMode: "connect-only",
 
-        // Enhanced UI settings
-        appName: "Grove",
-        appLogoUrl: "/favicon.ico",
-
-        // Preferred chains
-        walletConnectPreferredChains: [`eip155:${CITREA_TESTNET.id}` as const],
-
-        // Custom onboarding
-        onboardingImageUrl: "/favicon.ico",
+        // Configure only Citrea testnet - primary focus
+        overrides: {
+          evmNetworks: [
+            {
+              blockExplorerUrls: [
+                CITREA_TESTNET.blockExplorers?.default?.url ||
+                  "https://explorer.testnet.citrea.xyz",
+              ],
+              chainId: CITREA_TESTNET.id,
+              chainName: CITREA_TESTNET.name,
+              iconUrls: ["https://citrea.xyz/favicon.ico"],
+              name: CITREA_TESTNET.name,
+              nativeCurrency: {
+                decimals: CITREA_TESTNET.nativeCurrency.decimals,
+                name: CITREA_TESTNET.nativeCurrency.name,
+                symbol: CITREA_TESTNET.nativeCurrency.symbol,
+                iconUrl: "https://citrea.xyz/favicon.ico",
+              },
+              networkId: CITREA_TESTNET.id,
+              rpcUrls: [...CITREA_TESTNET.rpcUrls.default.http],
+              vanityName: "Citrea Testnet",
+            },
+          ],
+        },
       }}
     >
       <WagmiProvider config={config}>
