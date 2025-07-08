@@ -24,21 +24,14 @@ export default function Home() {
 
   // Only log in development and when connection state actually changes
   useEffect(() => {
-    if (process.env.NODE_ENV === "development" && mounted) {
-      // Only log meaningful changes
-      const logKey = `${connectionState.isConnected}-${connectionState.isConnecting}`;
-      const lastLogKey = sessionStorage.getItem("lastHomeLogKey");
-
-      if (logKey !== lastLogKey) {
-        console.log("Homepage state:", {
-          isConnected: connectionState.isConnected,
-          hasAddress: connectionState.hasAddress,
-          isConnecting: connectionState.isConnecting,
-        });
-        sessionStorage.setItem("lastHomeLogKey", logKey);
-      }
+    if (
+      process.env.NODE_ENV === "development" &&
+      mounted &&
+      connectionState.isConnected
+    ) {
+      console.log("Homepage: User connected");
     }
-  }, [connectionState, mounted]);
+  }, [connectionState.isConnected, mounted]);
 
   useEffect(() => {
     setMounted(true);

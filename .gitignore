@@ -39,3 +39,7 @@ next-env.d.ts
 # Prisma
 node_modules/.prisma/
 DYNAMIC_INTEGRATION.md
+
+misc
+.env
+.env-local

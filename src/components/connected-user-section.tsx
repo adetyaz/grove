@@ -2,6 +2,7 @@
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { useEffect, useState } from "react";
 import CircleDashboard from "./circle-dashboard";
+import EmailTestComponent from "./email-test";
 import { groveToast } from "@/lib/toast";
 
 export default function ConnectedUserSection() {
@@ -77,6 +78,15 @@ export default function ConnectedUserSection() {
         </div>
 
         <CircleDashboard />
+
+        {/* Email Test Component - Development Only */}
+        {process.env.NODE_ENV === "development" && (
+          <div className='mt-8'>
+            <div className='max-w-md mx-auto'>
+              <EmailTestComponent />
+            </div>
+          </div>
+        )}
 
         <div className='mt-16'>
           <div className='grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12'>

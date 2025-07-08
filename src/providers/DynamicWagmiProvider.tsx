@@ -47,8 +47,8 @@ export default function DynamicWagmiProvider({
         environmentId: process.env.NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID!,
         walletConnectors: [EthereumWalletConnectors],
 
-        // Simplified configuration for better MetaMask compatibility
-        initialAuthenticationMode: "connect-only",
+        // Authentication mode - connect and sign for full authentication
+        initialAuthenticationMode: "connect-and-sign",
 
         // App branding
         appName: "Grove",

@@ -287,19 +287,10 @@ export default function CircleDashboard() {
         <InviteForm
           circleId={inviteModal.circleId}
           circleName={inviteModal.circleName}
-          onClose={() =>
-            setInviteModal({ isOpen: false, circleId: 0, circleName: "" })
-          }
-        />
-      )}
-
-      {/* Invite Modal */}
-      {inviteModal.isOpen && (
-        <InviteForm
-          circleId={inviteModal.circleId}
-          circleName={inviteModal.circleName}
+          circleDescription={`Join our Bitcoin savings circle "${inviteModal.circleName}" and start building wealth together!`}
           onSuccess={() => {
-            // Optionally refresh or show success message
+            // Optionally refresh member count or show success message
+            console.log("Invitation sent successfully!");
           }}
           onClose={() =>
             setInviteModal({ isOpen: false, circleId: 0, circleName: "" })

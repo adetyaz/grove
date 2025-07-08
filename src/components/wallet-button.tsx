@@ -48,21 +48,11 @@ export default function WalletButton({
   // Only log in development and when state changes meaningfully
   useEffect(() => {
     if (process.env.NODE_ENV === "development") {
-      if (isConnecting || isDisconnecting || connectionState.isConnected) {
-        const logKey = `${connectionState.isConnected}-${isConnecting}-${isDisconnecting}`;
-        const lastLogKey = sessionStorage.getItem("lastWalletLogKey");
-
-        if (logKey !== lastLogKey) {
-          console.log("WalletButton state:", {
-            isConnected: connectionState.isConnected,
-            isConnecting,
-            isDisconnecting,
-          });
-          sessionStorage.setItem("lastWalletLogKey", logKey);
-        }
+      if (connectionState.isConnected) {
+        console.log("Wallet button: Connected");
       }
     }
-  }, [connectionState.isConnected, isConnecting, isDisconnecting]);
+  }, [connectionState.isConnected]);
 
   // Track connection status changes for notifications - use previous state tracking
   const [prevConnected, setPrevConnected] = useState<boolean | null>(null); // Start with null to detect initial state
@@ -159,15 +149,6 @@ export default function WalletButton({
 
   // Show connect button
   const handleConnect = () => {
-    if (process.env.NODE_ENV === "development") {
-      console.log("Connect button clicked!");
-    }
-
-    // Show toast notification about using Google login
-    groveToast.warning(
-      "Please use Google Login for now - MetaMask integration is being fixed!"
-    );
-
     connect();
   };
 
