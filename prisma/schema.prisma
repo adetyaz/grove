@@ -24,7 +24,7 @@ model User {
 }
 
 model Circle {
-  id            Int      @id @default(autoincrement())
+  id            String   @id @default(uuid()) // UUID primary key
   name          String
   description   String?
   targetAmount  String   // Stored as string to handle bigint
@@ -37,7 +37,9 @@ model Circle {
   members       User[]   @relation("CircleMembers")
   invites       Invite[] // Legacy invites
   invitations   CircleInvitation[] // New invitation system
-  onChainId     Int?     // Maps to contract's circleId
+  onChainId     Int?     @unique // Maps to contract's circleId (unique)
+  contractAddress String? // Which Grove contract this circle belongs to
+  syncStatus    String   @default("PENDING") // "PENDING", "SYNCED", "FAILED"
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -45,7 +47,7 @@ model Circle {
 model Invite {
   id        String   @id @default(uuid())
   circle    Circle   @relation(fields: [circleId], references: [id])
-  circleId  Int
+  circleId  String   // Changed from Int to String to match Circle.id
   email     String
   token     String   @unique
   expiresAt DateTime
@@ -54,7 +56,7 @@ model Invite {
 
 model CircleInvitation {
   id                      String   @id @default(uuid())
-  circleId                Int
+  circleId                String   // Changed from Int to String to match Circle.id
   circle                  Circle   @relation(fields: [circleId], references: [id])
   inviterEmail            String
   inviteeEmail            String?  // For email invitations

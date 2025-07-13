@@ -13,6 +13,9 @@ export function useDynamicConnection() {
   const connectionTimeoutRef = useRef<NodeJS.Timeout>();
   const cleanupTimeoutRef = useRef<NodeJS.Timeout>();
 
+  // Track last logged state to prevent repeated logs
+  const lastLoggedStateRef = useRef<string>("");
+
   // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
@@ -29,13 +32,23 @@ export function useDynamicConnection() {
   useEffect(() => {
     // Only log when there's a meaningful change and only in development
     if (process.env.NODE_ENV === "development") {
+      let currentState = "";
+      
       if (user && primaryWallet?.address) {
-        console.log(
-          "✅ Wallet connected:",
-          primaryWallet.address.slice(0, 6) + "..."
-        );
+        currentState = `connected:${primaryWallet.address.slice(0, 6)}`;
+        if (lastLoggedStateRef.current !== currentState) {
+          console.log(
+            "✅ Wallet connected:",
+            primaryWallet.address.slice(0, 6) + "..."
+          );
+          lastLoggedStateRef.current = currentState;
+        }
       } else if (!user && !primaryWallet) {
-        console.log("❌ Wallet disconnected");
+        currentState = "disconnected";
+        if (lastLoggedStateRef.current !== currentState) {
+          console.log("❌ Wallet disconnected");
+          lastLoggedStateRef.current = currentState;
+        }
       }
     }
   }, [user, primaryWallet]);

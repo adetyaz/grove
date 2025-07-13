@@ -1,9 +1,9 @@
-"use client";
 import { useState } from "react";
 import { groveToast } from "@/lib/toast";
 
 export interface InvitationData {
-  recipientEmail: string;
+  circleId: string; // Changed to string for UUID
+  recipientEmail?: string;
   recipientTelegram?: string;
   recipientWhatsApp?: string;
   circleName: string;
@@ -22,8 +22,8 @@ export function useInvitations() {
     setIsLoading(true);
 
     try {
-      // Generate invite link (you can customize this based on your routing)
-      const inviteLink = `${window.location.origin}/join?circle=${encodeURIComponent(invitationData.circleName)}&inviter=${inviterAddress}`;
+      // Generate invite link (now using circleId for uniqueness)
+      const inviteLink = `${window.location.origin}/join?circleId=${invitationData.circleId}&inviter=${inviterAddress}`;
 
       const response = await fetch("/api/invitations/send", {
         method: "POST",
@@ -45,28 +45,36 @@ export function useInvitations() {
         throw new Error(result.error || "Failed to send invitation");
       }
 
-      // Show success toast with details
+      // Only show toasts for channels the user actually filled
+      const attemptedChannels: string[] = [];
+      if (invitationData.recipientEmail) attemptedChannels.push("Email");
+      if (invitationData.recipientTelegram) attemptedChannels.push("Telegram");
+      if (invitationData.recipientWhatsApp) attemptedChannels.push("WhatsApp");
+
       const successChannels: string[] = [];
-      if (result.channels.email) successChannels.push("Email");
-      if (result.channels.telegram) successChannels.push("Telegram");
-      if (result.channels.whatsapp) successChannels.push("WhatsApp");
+      if (result.channels.email && invitationData.recipientEmail)
+        successChannels.push("Email");
+      if (result.channels.telegram && invitationData.recipientTelegram)
+        successChannels.push("Telegram");
+      if (result.channels.whatsapp && invitationData.recipientWhatsApp)
+        successChannels.push("WhatsApp");
 
-      groveToast.success(
-        `Invitation sent successfully via ${successChannels.join(", ")}! 📧`,
-        { autoClose: 5000 }
-      );
-
-      // Show additional info if some channels failed
-      if (successChannels.length < 3) {
-        const failedChannels = ["Email", "Telegram", "WhatsApp"].filter(
-          (channel) => !successChannels.includes(channel)
+      if (successChannels.length > 0) {
+        groveToast.success(
+          `Invitation sent successfully via ${successChannels.join(", ")}! 📧`,
+          { autoClose: 5000 }
         );
-        if (failedChannels.length > 0) {
-          groveToast.warning(
-            `Note: ${failedChannels.join(", ")} delivery failed, but invitation was sent via ${successChannels.join(", ")}`,
-            { autoClose: 8000 }
-          );
-        }
+      }
+
+      // Show warning only for attempted channels that failed
+      const failedChannels = attemptedChannels.filter(
+        (channel) => !successChannels.includes(channel)
+      );
+      if (failedChannels.length > 0) {
+        groveToast.warning(
+          `Note: ${failedChannels.join(", ")} delivery failed.`,
+          { autoClose: 8000 }
+        );
       }
 
       return {
@@ -93,35 +101,13 @@ export function useInvitations() {
     }
   };
 
+  // Only returns status, does not show toasts (UI can show if needed)
   const testNotificationServices = async () => {
     try {
       const response = await fetch("/api/invitations/send");
       const result = await response.json();
-
-      console.log("Notification services status:", result);
-
-      // Show toast with service status
-      const workingServices = Object.entries(result.services)
-        .filter(([, status]) => status)
-        .map(([service]) => service.charAt(0).toUpperCase() + service.slice(1));
-
-      if (workingServices.length > 0) {
-        groveToast.success(
-          `Notification services ready: ${workingServices.join(", ")} ✅`,
-          { autoClose: 5000 }
-        );
-      } else {
-        groveToast.warning(
-          "No notification services are currently configured ⚠️",
-          { autoClose: 5000 }
-        );
-      }
-
       return result;
-    } catch (error) {
-      groveToast.error(
-        `Failed to test services: ${error instanceof Error ? error.message : "Unknown error"}`
-      );
+    } catch {
       return null;
     }
   };

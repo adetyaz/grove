@@ -1,3 +1,4 @@
+// (Removed stray simulateClaimAchievement method from top of file)
 import {
   GROVE_CONTRACT_ADDRESS,
   GROVE_ABI,
@@ -5,66 +6,86 @@ import {
   type CreateCircleParams,
   type AddMemberParams,
   type ContributeParams,
-  PaymentType,
 } from "@/contracts/constants";
 import { getPublicClient } from "@/lib/web3";
 import { type Address } from "viem";
 
 export class GroveContractService {
+  /**
+   * Simulate claiming an achievement NFT
+   * @param params { circleId: number, achievementId: string }
+   * @param account {Address}
+   */
+  async simulateClaimAchievement(
+    params: { circleId: number; achievementId: string },
+    account: Address
+  ) {
+    return await this.publicClient.simulateContract({
+      address: GROVE_CONTRACT_ADDRESS,
+      abi: GROVE_ABI,
+      functionName: "claimAchievement",
+      args: [BigInt(params.circleId), params.achievementId],
+      account,
+    });
+  }
   private publicClient = getPublicClient();
 
   /**
    * Read a circle's details from the contract
    */
-  async getCircle(circleId: number): Promise<Circle | null> {
+  async getCircle(circleId: number): Promise<Partial<Circle> | null> {
     try {
+      // Use the 'circles' mapping getter from the contract (returns id, owner, name)
       const result = await this.publicClient.readContract({
         address: GROVE_CONTRACT_ADDRESS,
         abi: GROVE_ABI,
-        functionName: "getCircle",
+        functionName: "circles",
         args: [BigInt(circleId)],
       });
 
-      // Transform the contract result to our Circle interface
-      const [
-        id,
-        owner,
-        name,
-        description,
-        targetAmount,
-        currentAmount,
-        paymentType,
-        fixedAmount,
-        deadline,
-        isActive,
-        memberCount,
-      ] = result as [
+      // The mapping returns: id, owner, name (NO members array from public mapping)
+      const [id, owner, name] = result as [
         bigint, // id
         Address, // owner
         string, // name
-        string, // description
-        bigint, // targetAmount
-        bigint, // currentAmount
-        number, // paymentType
-        bigint, // fixedAmount
-        bigint, // deadline
-        boolean, // isActive
-        bigint, // memberCount
       ];
+
+      // Get members separately using getMembers function
+      let members: Address[] = [];
+      try {
+        members = (await this.publicClient.readContract({
+          address: GROVE_CONTRACT_ADDRESS,
+          abi: GROVE_ABI,
+          functionName: "getMembers",
+          args: [BigInt(circleId)],
+        })) as Address[];
+      } catch {
+        members = []; // Fallback to empty array
+      }
+
+      // Try to get current amount from SatVault if available
+      let currentAmount = BigInt(0);
+      try {
+        currentAmount = (await this.publicClient.readContract({
+          address: GROVE_CONTRACT_ADDRESS,
+          abi: GROVE_ABI,
+          functionName: "getCircleBalance",
+          args: [BigInt(circleId)],
+        })) as bigint;
+      } catch {
+        // fallback to 0
+      }
 
       return {
         id: Number(id),
         owner: owner as Address,
         name: name as string,
-        description: description as string,
-        targetAmount: targetAmount as bigint,
-        currentAmount: currentAmount as bigint,
-        paymentType: paymentType as PaymentType,
-        fixedAmount: fixedAmount as bigint,
-        deadline: deadline as bigint,
-        isActive: isActive as boolean,
-        memberCount: Number(memberCount),
-        members: [], // Would need separate call to get members
+        targetAmount: BigInt(0), // Not stored in this simple contract
+        currentAmount,
+        deadline: BigInt(0), // Not stored in this simple contract
+        isActive: Number(id) > 0, // Circle exists if id > 0
+        memberCount: members.length,
+        members: members,
       };
     } catch (error) {
       console.error("Error fetching circle:", error);
@@ -99,7 +120,7 @@ export class GroveContractService {
       const result = await this.publicClient.readContract({
         address: GROVE_CONTRACT_ADDRESS,
         abi: GROVE_ABI,
-        functionName: "getCircleMembers",
+        functionName: "getMembers",
         args: [BigInt(circleId)],
       });
 
@@ -149,17 +170,22 @@ export class GroveContractService {
    * Simulate contract calls before executing them
    */
   async simulateCreateCircle(params: CreateCircleParams, account: Address) {
+    // Map frontend params to contract params
+    // Contract expects: (name, contributionAmount, interval, goal)
+    // NOTE: Skip SatVault for now due to ownership issues
+    const contributionAmount = BigInt(1); // Minimal amount to avoid zero
+    const interval = BigInt(86400); // Default to 1 day interval
+    const goal = params.targetAmount;
+
     return await this.publicClient.simulateContract({
       address: GROVE_CONTRACT_ADDRESS,
       abi: GROVE_ABI,
       functionName: "createCircle",
       args: [
-        params.name,
-        params.description,
-        params.targetAmount,
-        params.paymentType,
-        params.fixedAmount || BigInt(0),
-        params.deadline,
+        params.name, // string _name
+        contributionAmount, // uint _contributionAmount
+        interval, // uint _interval
+        goal, // uint _goal
       ],
       account,
     });
@@ -175,6 +201,16 @@ export class GroveContractService {
     });
   }
 
+  async simulateJoinCircle(circleId: number, account: Address) {
+    return await this.publicClient.simulateContract({
+      address: GROVE_CONTRACT_ADDRESS,
+      abi: GROVE_ABI,
+      functionName: "joinCircle",
+      args: [BigInt(circleId)],
+      account,
+    });
+  }
+
   async simulateContribute(params: ContributeParams, account: Address) {
     return await this.publicClient.simulateContract({
       address: GROVE_CONTRACT_ADDRESS,
@@ -183,6 +219,42 @@ export class GroveContractService {
       args: [BigInt(params.circleId)],
       account,
       value: params.amount,
+    });
+  }
+
+  /**
+   * Simulate a withdrawal from a circle
+   * @param params { circleId: number, amount: bigint }
+   * @param account {Address}
+   */
+  async simulateWithdraw(
+    params: { circleId: number; amount: bigint },
+    account: Address
+  ) {
+    return await this.publicClient.simulateContract({
+      address: GROVE_CONTRACT_ADDRESS,
+      abi: GROVE_ABI,
+      functionName: "withdraw",
+      args: [BigInt(params.circleId), params.amount],
+      account,
+    });
+  }
+
+  /**
+   * Simulate sending a gift within a circle
+   * @param params { circleId: number, recipient: string, amount: bigint }
+   * @param account {Address}
+   */
+  async simulateGift(
+    params: { circleId: number; recipient: string; amount: bigint },
+    account: Address
+  ) {
+    return await this.publicClient.simulateContract({
+      address: GROVE_CONTRACT_ADDRESS,
+      abi: GROVE_ABI,
+      functionName: "gift",
+      args: [BigInt(params.circleId), params.recipient, params.amount],
+      account,
     });
   }
 }

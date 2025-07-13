@@ -1,90 +1,107 @@
 "use client";
-import { useState, useEffect } from "react";
-import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { parseEther } from "viem";
-import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/contracts/constants";
 import { groveToast } from "@/lib/toast";
+import { achievementNFTContract } from "@/lib/achievementnft-contract";
+import { useWriteContract } from "wagmi";
+import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/contracts/constants";
 
 interface ContributeFormProps {
-  circleId: number;
+  circleId: string; // UUID
+  onChainId: number; // Contract ID
   circleName: string;
   onSuccess?: () => void;
   onClose?: () => void;
 }
 
 export default function ContributeForm({
-  circleId,
+  circleId, // eslint-disable-line @typescript-eslint/no-unused-vars
+  onChainId,
   circleName,
   onSuccess,
   onClose,
 }: ContributeFormProps) {
   const [amount, setAmount] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [timeoutReached, setTimeoutReached] = useState(false);
+  const [hash, setHash] = useState<string | undefined>(undefined);
   const { primaryWallet } = useDynamicConnection();
   const address = primaryWallet?.address;
 
-  const { writeContract, data: hash, error, isPending } = useWriteContract();
+  const { writeContractAsync } = useWriteContract();
 
-  const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({
-      hash,
-    });
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (!amount || !address) {
+        throw new Error(
+          "Please enter a valid amount and ensure wallet is connected"
+        );
+      }
 
-  // Handle transaction states with toast notifications
-  useEffect(() => {
-    if (hash) {
-      groveToast.transactionPending(hash);
-    }
-  }, [hash]);
+      if (!onChainId) {
+        throw new Error(
+          "Circle not yet synced to blockchain. Please wait for sync to complete."
+        );
+      }
 
-  useEffect(() => {
-    if (isConfirmed) {
+      setTimeoutReached(false);
+
+      // Use Grove contract's contribute method with onChainId
+      const txHash = await writeContractAsync({
+        address: GROVE_CONTRACT_ADDRESS,
+        abi: GROVE_ABI,
+        functionName: "contribute",
+        args: [BigInt(onChainId)],
+        value: parseEther(amount),
+      });
+
+      setHash(txHash);
+      groveToast.transactionPending(txHash);
+      // Wait for confirmation (simulate delay)
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      // === Step 5: Automatic Achievement Minting (placeholder logic) ===
+      // TODO: Replace this with real milestone logic
+      try {
+        if (address) {
+          const achievementId = "contributor";
+          const tokenURI = "https://example.com/achievement/contributor";
+          await achievementNFTContract.mintAchievement(
+            address as `0x${string}`,
+            achievementId,
+            tokenURI,
+            address as `0x${string}`
+          );
+          groveToast.success("Achievement NFT minted for your contribution!");
+        }
+      } catch (mintErr: any) {
+        groveToast.error(
+          "Failed to mint achievement NFT: " +
+            (mintErr?.message || "Unknown error")
+        );
+      }
+      // === End Step 5 logic ===
+    },
+    onSuccess: () => {
       groveToast.contributionMade(`${amount} BTC`);
       setTimeout(() => {
         onSuccess?.();
         onClose?.();
       }, 2000);
-    }
-  }, [isConfirmed, amount, onSuccess, onClose]);
+    },
+    onError: (err: any) => {
+      groveToast.error(`Contribution failed: ${err.message || err.toString()}`);
+    },
+  });
 
-  useEffect(() => {
-    if (error) {
-      groveToast.error(`Contribution failed: ${error.message}`);
-    }
-  }, [error]);
+  // Timeout fallback: close modal after 60s if not confirmed
+  // (react-query mutation will handle most cases, but we keep this for UI feedback)
+  // Optionally, you can add a timer here if needed for extra feedback.
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || !address) {
-      groveToast.error(
-        "Please enter a valid amount and ensure wallet is connected"
-      );
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-
-      writeContract({
-        address: GROVE_CONTRACT_ADDRESS,
-        abi: GROVE_ABI,
-        functionName: "contribute",
-        args: [BigInt(circleId)],
-        value: parseEther(amount),
-      });
-    } catch (err) {
-      console.error("Error contributing:", err);
-      groveToast.error("Failed to initiate contribution. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
+    mutation.mutate();
   };
-
-  // Handle success
-  if (isConfirmed) {
-    // This is handled in useEffect now with toast notification
-  }
 
   return (
     <div className='fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50'>
@@ -101,7 +118,7 @@ export default function ContributeForm({
           </p>
         </div>
 
-        {isConfirmed ? (
+        {mutation.isSuccess ? (
           <div className='text-center py-8'>
             <div className='w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4'>
               <span className='text-2xl'>✅</span>
@@ -115,6 +132,25 @@ export default function ContributeForm({
             <div className='text-sm text-gray-400'>
               Transaction: {hash?.slice(0, 6)}...{hash?.slice(-4)}
             </div>
+          </div>
+        ) : timeoutReached ? (
+          <div className='text-center py-8'>
+            <div className='w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4'>
+              <span className='text-2xl'>⏰</span>
+            </div>
+            <h3 className='text-xl font-bold text-white mb-2'>
+              Confirmation Timeout
+            </h3>
+            <p className='text-gray-300 mb-4'>
+              The transaction is taking longer than expected to confirm. Please
+              check your wallet or try again later.
+            </p>
+            <button
+              className='mt-4 py-2 px-6 bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-800 transition-colors'
+              onClick={onClose}
+            >
+              Close
+            </button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className='space-y-6'>
@@ -137,9 +173,11 @@ export default function ContributeForm({
               </p>
             </div>
 
-            {error && (
+            {mutation.isError && (
               <div className='bg-red-500/20 border border-red-500/30 rounded-lg p-4'>
-                <p className='text-red-200 text-sm'>Error: {error.message}</p>
+                <p className='text-red-200 text-sm'>
+                  Error: {mutation.error?.message || mutation.error?.toString()}
+                </p>
               </div>
             )}
 
@@ -148,29 +186,25 @@ export default function ContributeForm({
                 type='button'
                 onClick={onClose}
                 className='flex-1 py-3 px-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-colors'
-                disabled={isPending || isConfirming}
+                disabled={mutation.isPending}
               >
                 Cancel
               </button>
               <button
                 type='submit'
-                disabled={!amount || isPending || isConfirming || isLoading}
+                disabled={!amount || mutation.isPending}
                 className='flex-1 py-3 px-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-all duration-200'
               >
-                {isPending || isConfirming || isLoading
-                  ? "Contributing..."
-                  : "Contribute"}
+                {mutation.isPending ? "Contributing..." : "Contribute"}
               </button>
             </div>
 
-            {(isPending || isConfirming) && (
+            {mutation.isPending && !timeoutReached && (
               <div className='bg-blue-500/20 border border-blue-500/30 rounded-lg p-4'>
                 <div className='flex items-center space-x-2'>
                   <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400'></div>
                   <p className='text-blue-200 text-sm'>
-                    {isPending
-                      ? "Confirm transaction in your wallet..."
-                      : "Transaction confirming..."}
+                    {"Processing contribution..."}
                   </p>
                 </div>
               </div>

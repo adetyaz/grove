@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/db";
 import { NextRequest } from "next/server";
+import ContractSyncService from "@/lib/contract-sync";
 
-// POST endpoint to store circle data after on-chain creation
+// POST endpoint to store circle data BEFORE on-chain creation
 export async function POST(req: NextRequest) {
   try {
     const {
@@ -11,21 +12,17 @@ export async function POST(req: NextRequest) {
       paymentType,
       fixedAmount,
       deadline,
-      transactionHash,
-      onChainId,
       ownerWallet,
       ownerEmail,
     } = await req.json();
 
-    console.log("Storing circle data:", {
+    console.log("Creating circle in database:", {
       name,
       description,
       targetAmount,
       paymentType,
       fixedAmount,
       deadline,
-      transactionHash,
-      onChainId,
       ownerWallet,
       ownerEmail,
     });
@@ -46,7 +43,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Store circle in database
+    // Create circle in database with UUID, but no onChainId yet
     const circle = await prisma.circle.create({
       data: {
         name,
@@ -55,9 +52,8 @@ export async function POST(req: NextRequest) {
         paymentType: paymentType === 1 ? "RECURRING" : "ONETIME",
         fixedAmount: fixedAmount ? fixedAmount.toString() : null,
         deadline: new Date(Number(deadline) * 1000),
-        transactionHash,
-        onChainId: onChainId ? Number(onChainId) : null,
         ownerId: user.id,
+        syncStatus: "PENDING", // Will be updated after blockchain transaction
       },
       include: {
         owner: {
@@ -69,11 +65,12 @@ export async function POST(req: NextRequest) {
     return Response.json({
       success: true,
       circle,
+      databaseId: circle.id, // Return UUID for frontend to track
     });
   } catch (error) {
-    console.error("Error storing circle data:", error);
+    console.error("Error creating circle in database:", error);
     return Response.json(
-      { error: "Failed to store circle data", details: error },
+      { error: "Failed to create circle", details: error },
       { status: 500 }
     );
   }
@@ -86,16 +83,31 @@ export async function GET(req: NextRequest) {
     const userWallet = searchParams.get("userWallet");
     const userEmail = searchParams.get("userEmail");
 
-    let whereClause = {};
-
-    if (userWallet) {
-      whereClause = { owner: { wallet: userWallet } };
-    } else if (userEmail) {
-      whereClause = { owner: { email: userEmail } };
+    if (!userWallet && !userEmail) {
+      // No user context, return nothing
+      return Response.json({ circles: [] });
     }
 
+    // Find the user by wallet or email
+    // Build user OR clause safely (no undefined)
+    const userOr: any[] = [];
+    if (userWallet) userOr.push({ wallet: userWallet });
+    if (userEmail) userOr.push({ email: userEmail });
+
+    const user = await prisma.user.findFirst({
+      where: { OR: userOr },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return Response.json({ circles: [] });
+    }
+
+    // Find all circles where user is owner or member
     const circles = await prisma.circle.findMany({
-      where: whereClause,
+      where: {
+        OR: [{ ownerId: user.id }, { members: { some: { id: user.id } } }],
+      },
       include: {
         owner: {
           select: { id: true, email: true, name: true, wallet: true },

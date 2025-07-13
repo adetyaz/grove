@@ -1,80 +1,53 @@
 "use client";
-import { useAccount, useReadContract } from "wagmi";
-import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/contracts/constants";
+
+import { useState } from "react";
+import { UserPlus } from "lucide-react";
+import ContributeForm from "./contribute-form";
+import InviteForm from "./invite-form";
+import InheritanceForm from "./inheritance-form";
+import InheritanceClaimForm from "./inheritance-claim-form";
 import {
-  groveContract,
   formatBTCAmount,
   calculateProgress,
   formatDeadline,
 } from "@/lib/grove-contract";
-import { useEffect, useState } from "react";
-import { UserPlus } from "lucide-react";
-import ContributeForm from "./contribute-form";
-import InviteForm from "./invite-form";
 
-interface Circle {
-  id: number;
-  name: string;
-  description: string;
-  targetAmount: bigint;
-  currentAmount: bigint;
-  deadline: bigint;
-  isActive: boolean;
-  memberCount: number;
-}
-
-export default function CircleDashboard() {
-  const { address, isConnected } = useAccount();
-  const [circles, setCircles] = useState<Circle[]>([]);
-  const [loading, setLoading] = useState(false);
+export default function CircleDashboard({
+  dashboardData,
+  loading,
+  refresh,
+}: {
+  dashboardData: any;
+  loading: boolean;
+  refresh: () => void;
+}) {
   const [contributeModal, setContributeModal] = useState<{
     isOpen: boolean;
-    circleId: number;
+    circleId: string;
+    onChainId: number;
     circleName: string;
-  }>({ isOpen: false, circleId: 0, circleName: "" });
+  }>({ isOpen: false, circleId: "", onChainId: 0, circleName: "" });
+
   const [inviteModal, setInviteModal] = useState<{
+    isOpen: boolean;
+    circleId: string;
+    circleName: string;
+  }>({ isOpen: false, circleId: "", circleName: "" });
+
+  const [inheritanceModal, setInheritanceModal] = useState<{
     isOpen: boolean;
     circleId: number;
     circleName: string;
   }>({ isOpen: false, circleId: 0, circleName: "" });
 
-  // Get user's circle IDs
-  const { data: userCircleIds, isLoading: loadingIds } = useReadContract({
-    address: GROVE_CONTRACT_ADDRESS,
-    abi: GROVE_ABI,
-    functionName: "getUserCircles",
-    args: address ? [address] : undefined,
-    query: {
-      enabled: !!address,
-    },
-  });
+  const [claimModal, setClaimModal] = useState<{
+    isOpen: boolean;
+    circleId: number;
+    maxAmount: bigint;
+    receiver: string;
+  }>({ isOpen: false, circleId: 0, maxAmount: BigInt(0), receiver: "" });
 
-  useEffect(() => {
-    const fetchCircleDetails = async () => {
-      if (!userCircleIds || !Array.isArray(userCircleIds)) return;
-
-      setLoading(true);
-      try {
-        const circlePromises = userCircleIds.map((id: bigint) =>
-          groveContract.getCircle(Number(id))
-        );
-
-        const circleDetails = await Promise.all(circlePromises);
-        const validCircles = circleDetails.filter(
-          (circle) => circle !== null
-        ) as Circle[];
-        setCircles(validCircles);
-      } catch (error) {
-        console.error("Error fetching circle details:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCircleDetails();
-  }, [userCircleIds]);
-
-  if (!isConnected) {
+  if (!dashboardData || dashboardData.circles.length === 0) {
     return (
       <div className='text-center py-16'>
         <div className='max-w-md mx-auto'>
@@ -92,7 +65,7 @@ export default function CircleDashboard() {
     );
   }
 
-  if (loadingIds || loading) {
+  if (loading) {
     return (
       <div className='text-center py-16'>
         <div className='animate-spin rounded-full h-12 w-12 border-b-4 border-orange-500 mx-auto mb-4'></div>
@@ -106,7 +79,7 @@ export default function CircleDashboard() {
     );
   }
 
-  if (circles.length === 0) {
+  if (dashboardData.circles.length === 0) {
     return (
       <div className='text-center py-16'>
         <div className='max-w-md mx-auto'>
@@ -139,8 +112,8 @@ export default function CircleDashboard() {
             Your Savings Grove
           </h2>
           <p className='text-gray-300'>
-            {circles.length} active circle{circles.length !== 1 ? "s" : ""}{" "}
-            growing your wealth
+            {dashboardData.circles.length} active circle
+            {dashboardData.circles.length !== 1 ? "s" : ""} growing your wealth
           </p>
         </div>
         <a
@@ -153,7 +126,7 @@ export default function CircleDashboard() {
       </div>
 
       <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
-        {circles.map((circle) => {
+        {dashboardData.circles.map((circle: any) => {
           const progress = calculateProgress(
             circle.currentAmount,
             circle.targetAmount
@@ -221,7 +194,7 @@ export default function CircleDashboard() {
 
                 <div className='grid grid-cols-2 gap-4 text-sm'>
                   <div className='flex items-center space-x-2'>
-                    <UserPlus className='w-4 h-4 text-blue-400' />
+                    <UserPlus className='w-4 h-4 text-blue-600' />
                     <span className='text-gray-300'>
                       {circle.memberCount} members
                     </span>
@@ -242,6 +215,7 @@ export default function CircleDashboard() {
                       setContributeModal({
                         isOpen: true,
                         circleId: circle.id,
+                        onChainId: circle.onChainId,
                         circleName: circle.name,
                       });
                     }}
@@ -249,7 +223,7 @@ export default function CircleDashboard() {
                     Contribute
                   </button>
                   <button
-                    className='flex-1 bg-gradient-to-r from-blue-500/20 to-blue-600/20 border border-blue-500/30 text-blue-300 py-2 px-3 rounded-lg text-sm font-medium hover:from-blue-500/30 hover:to-blue-600/30 transition-all duration-200'
+                    className='flex-1 bg-gradient-to-r from-blue-500/20 to-blue-600/20 border border-blue-500/30 text-blue-600 py-2 px-3 rounded-lg text-sm font-medium hover:from-blue-500/30 hover:to-blue-600/30 transition-all duration-200'
                     onClick={() => {
                       setInviteModal({
                         isOpen: true,
@@ -259,6 +233,31 @@ export default function CircleDashboard() {
                     }}
                   >
                     Invite
+                  </button>
+                  <button
+                    className='flex-1 bg-gradient-to-r from-purple-500/20 to-purple-600/20 border border-purple-500/30 text-purple-300 py-2 px-3 rounded-lg text-sm font-medium hover:from-purple-500/30 hover:to-purple-600/30 transition-all duration-200'
+                    onClick={() => {
+                      setInheritanceModal({
+                        isOpen: true,
+                        circleId: circle.id,
+                        circleName: circle.name,
+                      });
+                    }}
+                  >
+                    Set Inheritance
+                  </button>
+                  <button
+                    className='flex-1 bg-gradient-to-r from-yellow-500/20 to-yellow-600/20 border border-yellow-500/30 text-yellow-300 py-2 px-3 rounded-lg text-sm font-medium hover:from-yellow-500/30 hover:to-yellow-600/30 transition-all duration-200'
+                    onClick={() => {
+                      setClaimModal({
+                        isOpen: true,
+                        circleId: circle.id,
+                        maxAmount: circle.currentAmount,
+                        receiver: "", // TODO: set to beneficiary address
+                      });
+                    }}
+                  >
+                    Claim Inheritance
                   </button>
                 </div>
               </div>
@@ -271,18 +270,79 @@ export default function CircleDashboard() {
       {contributeModal.isOpen && (
         <ContributeForm
           circleId={contributeModal.circleId}
+          onChainId={contributeModal.onChainId}
           circleName={contributeModal.circleName}
           onSuccess={() => {
-            // Refresh the circles data after successful contribution
-            window.location.reload();
+            // Refresh dashboard data after successful contribution
+            refresh();
+            setTimeout(() => {
+              setContributeModal({
+                isOpen: false,
+                circleId: "",
+                onChainId: 0,
+                circleName: "",
+              });
+            }, 1500);
           }}
           onClose={() =>
-            setContributeModal({ isOpen: false, circleId: 0, circleName: "" })
+            setContributeModal({
+              isOpen: false,
+              circleId: "",
+              onChainId: 0,
+              circleName: "",
+            })
           }
         />
       )}
 
       {/* Invite Modal */}
+      {/* Inheritance Modal */}
+      {inheritanceModal.isOpen && (
+        <InheritanceForm
+          circleId={inheritanceModal.circleId}
+          onSuccess={() => {
+            refresh();
+            setTimeout(() => {
+              setInheritanceModal({
+                isOpen: false,
+                circleId: 0,
+                circleName: "",
+              });
+            }, 1500);
+          }}
+          onClose={() =>
+            setInheritanceModal({ isOpen: false, circleId: 0, circleName: "" })
+          }
+        />
+      )}
+
+      {/* Inheritance Claim Modal */}
+      {claimModal.isOpen && (
+        <InheritanceClaimForm
+          circleId={claimModal.circleId}
+          maxAmount={claimModal.maxAmount}
+          receiver={claimModal.receiver}
+          onSuccess={() => {
+            refresh();
+            setTimeout(() => {
+              setClaimModal({
+                isOpen: false,
+                circleId: 0,
+                maxAmount: BigInt(0),
+                receiver: "",
+              });
+            }, 1500);
+          }}
+          onClose={() =>
+            setClaimModal({
+              isOpen: false,
+              circleId: 0,
+              maxAmount: BigInt(0),
+              receiver: "",
+            })
+          }
+        />
+      )}
       {inviteModal.isOpen && (
         <InviteForm
           circleId={inviteModal.circleId}
@@ -293,7 +353,7 @@ export default function CircleDashboard() {
             console.log("Invitation sent successfully!");
           }}
           onClose={() =>
-            setInviteModal({ isOpen: false, circleId: 0, circleName: "" })
+            setInviteModal({ isOpen: false, circleId: "", circleName: "" })
           }
         />
       )}

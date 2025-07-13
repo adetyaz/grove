@@ -12,21 +12,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Mail,
-  MessageCircle,
-  Phone,
-  Send,
-  TestTube,
-  Copy,
-  Check,
-} from "lucide-react";
-import { useInvitations, InvitationData } from "@/hooks/useInvitations";
+import { Mail, MessageCircle, Phone, Send } from "lucide-react";
+import { useInvitations } from "@/hooks/useInvitations";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { groveToast } from "@/lib/toast";
 
 interface InviteFormProps {
-  circleId: number;
+  circleId: string; // Changed to string for UUID
   circleName: string;
   circleDescription?: string;
   onSuccess?: () => void;
@@ -86,7 +78,8 @@ export default function InviteForm({
     }
 
     try {
-      const invitationData: InvitationData = {
+      const invitationData = {
+        circleId, // Ensure the backend and InvitationData type support this
         recipientEmail: email,
         recipientTelegram: telegram || undefined,
         recipientWhatsApp: whatsapp || undefined,
@@ -119,9 +112,6 @@ export default function InviteForm({
     <div className='fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50'>
       <Card className='bg-white/10 backdrop-blur-sm border-white/20 max-w-lg w-full text-white'>
         <CardHeader className='text-center'>
-          <div className='w-16 h-16 bg-gradient-to-br from-green-400 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4'>
-            <Send className='w-8 h-8 text-white' />
-          </div>
           <CardTitle className='text-2xl'>Invite to Circle</CardTitle>
           <CardDescription className='text-gray-300'>
             Invite someone to join &ldquo;{circleName}&rdquo; and start growing

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { notificationService } from "@/lib/notifications";
-import { groveToast } from "@/lib/toast";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
     const {
+      circleId, // UUID of the circle
       recipientEmail,
       recipientTelegram,
       recipientWhatsApp,
@@ -15,11 +15,11 @@ export async function POST(request: NextRequest) {
       inviterEmail, // Get sender email from frontend
       circleName,
       inviteLink,
-      circleDescription,
     } = body;
 
     // Validate required fields
     if (
+      !circleId ||
       !recipientEmail ||
       !inviterName ||
       !inviterAddress ||
@@ -70,44 +70,49 @@ export async function POST(request: NextRequest) {
     console.log("🌳 Circle:", circleName);
     console.log("👤 Inviter:", inviterName);
 
-    // Send invitation across all channels
-    const results = await notificationService.sendInvitation({
-      recipientEmail,
-      recipientTelegram,
-      recipientWhatsApp,
-      inviterName,
-      inviterAddress,
-      inviterEmail, // Pass sender email to service
-      circleName,
-      inviteLink,
-      circleDescription,
-    });
+    // Send invitation across all channels using the new notification system
+    const results = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/send`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event: "send_invitation",
+          circleId: circleId, // This should be the UUID from the request
+          data: {
+            recipientEmail,
+            recipientTelegram,
+            recipientWhatsApp,
+            inviterName,
+            inviterEmail,
+            inviterAddress,
+          },
+        }),
+      }
+    );
 
-    console.log("📨 Invitation results:", results);
+    const notificationResponse = await results.json();
 
-    // Check if at least one channel succeeded
-    const hasSuccess = Object.values(results).some((result) => result.success);
+    console.log("📨 Invitation results:", notificationResponse);
+
+    // Check if the notification was successful
+    const hasSuccess = notificationResponse.success;
 
     if (!hasSuccess) {
       return NextResponse.json(
         {
           error: "Failed to send invitation through any channel",
-          details: results,
+          details: notificationResponse.results || notificationResponse.error,
         },
         { status: 500 }
       );
     }
 
-    // Return success with details of which channels worked
+    // Return success with notification details
     return NextResponse.json({
       success: true,
       message: "Invitation sent successfully",
-      results,
-      channels: {
-        email: results.email.success,
-        telegram: results.telegram.success,
-        whatsapp: results.whatsapp.success,
-      },
+      results: notificationResponse.results,
     });
   } catch (error) {
     console.error("❌ Error sending invitation:", error);

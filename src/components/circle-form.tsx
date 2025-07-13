@@ -1,16 +1,11 @@
 "use client";
-import {
-  useWriteContract,
-  useWaitForTransactionReceipt,
-  useAccount,
-  useSwitchChain,
-} from "wagmi";
+import { useAccount, useSwitchChain, useWriteContract } from "wagmi";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import {
-  GROVE_ABI,
-  GROVE_CONTRACT_ADDRESS,
   PaymentType,
   CITREA_TESTNET,
+  GROVE_CONTRACT_ADDRESS,
+  GROVE_ABI,
 } from "@/contracts/constants";
 import { useState, useEffect } from "react";
 import { parseEther } from "viem";
@@ -27,22 +22,19 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
   const address = primaryWallet?.address;
   const isConnected = !!(user && primaryWallet?.address);
 
-  // Check if user is on the correct network
-  const isOnCorrectNetwork = chain?.id === CITREA_TESTNET.id;
-
+  // Wagmi hook for contract writes
   const {
-    writeContract,
-    data: hash,
+    writeContractAsync,
     isPending,
     error: writeError,
   } = useWriteContract();
-  const {
-    isLoading: isConfirming,
-    isSuccess: isConfirmed,
-    error: receiptError,
-  } = useWaitForTransactionReceipt({
-    hash,
-  });
+
+  // Check if user is on the correct network
+  const isOnCorrectNetwork = chain?.id === CITREA_TESTNET.id;
+
+  const [hash, setHash] = useState<string | undefined>(undefined);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isConfirmed, setIsConfirmed] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -52,101 +44,6 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
     fixedAmount: "",
     deadline: "",
   });
-
-  // Handle successful transaction
-  useEffect(() => {
-    const storeCircleData = async () => {
-      if (isConfirmed && hash && address) {
-        try {
-          groveToast.circleCreated(formData.name);
-
-          // Get transaction receipt to extract circle ID from events
-          const receipt = await fetch(`/api/transaction/${hash}`);
-          let onChainId = undefined;
-
-          if (receipt.ok) {
-            const receiptData = await receipt.json();
-            // Extract circle ID from transaction logs if available
-            onChainId = receiptData.circleId;
-          }
-
-          // Store circle data in database
-          const targetAmountWei = parseEther(formData.targetAmount);
-          const fixedAmountWei = formData.fixedAmount
-            ? parseEther(formData.fixedAmount)
-            : BigInt(0);
-          const deadlineTimestamp = BigInt(
-            Math.floor(new Date(formData.deadline).getTime() / 1000)
-          );
-
-          console.log("Storing circle data:", {
-            name: formData.name,
-            targetAmount: targetAmountWei.toString(),
-            transactionHash: hash,
-            onChainId,
-          });
-
-          const response = await fetch("/api/circles", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              name: formData.name,
-              description: formData.description,
-              targetAmount: targetAmountWei.toString(),
-              paymentType: formData.paymentType,
-              fixedAmount: fixedAmountWei.toString(),
-              deadline: deadlineTimestamp.toString(),
-              transactionHash: hash,
-              onChainId,
-              ownerWallet: address,
-              ownerEmail: `${address}@grove.temp`, // Temporary email
-            }),
-          });
-
-          if (!response.ok) {
-            if (process.env.NODE_ENV === "development") {
-              console.error("Failed to store circle data");
-            }
-            groveToast.warning(
-              "Circle created on-chain but failed to store locally"
-            );
-          } else {
-            await response.json();
-            groveToast.success("Circle data stored successfully!");
-
-            // Trigger onSuccess callback to redirect to dashboard
-            if (onSuccess) {
-              setTimeout(() => {
-                onSuccess();
-              }, 1000);
-            }
-          }
-        } catch (error) {
-          if (process.env.NODE_ENV === "development") {
-            console.error("Error storing circle data:", error);
-          }
-          groveToast.warning(
-            "Circle created on-chain but failed to store locally"
-          );
-        }
-
-        // Reset form on success
-        setFormData({
-          name: "",
-          description: "",
-          targetAmount: "",
-          paymentType: PaymentType.OneTime,
-          fixedAmount: "",
-          deadline: "",
-        });
-        onSuccess?.();
-      }
-    };
-
-    storeCircleData();
-  }, [isConfirmed, hash, address, formData, onSuccess]);
 
   // Handle transaction hash
   useEffect(() => {
@@ -160,10 +57,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
     if (writeError) {
       groveToast.error(`Transaction failed: ${writeError.message}`);
     }
-    if (receiptError) {
-      groveToast.error(`Transaction error: ${receiptError.message}`);
-    }
-  }, [writeError, receiptError]);
+  }, [writeError]);
 
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -193,23 +87,18 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
       const fixedAmountWei = formData.fixedAmount
         ? parseEther(formData.fixedAmount)
         : BigInt(0);
-
-      // Convert deadline to timestamp
       const deadlineTimestamp = BigInt(
         Math.floor(new Date(formData.deadline).getTime() / 1000)
       );
 
-      // Validate the inputs
       if (targetAmountWei <= 0) {
         groveToast.error("Target amount must be greater than 0");
         return;
       }
-
       if (deadlineTimestamp <= BigInt(Math.floor(Date.now() / 1000))) {
         groveToast.error("Deadline must be in the future");
         return;
       }
-
       if (
         formData.paymentType === PaymentType.Recurring &&
         fixedAmountWei <= 0
@@ -218,31 +107,109 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
         return;
       }
 
-      console.log("Creating circle with params:", {
-        name: formData.name,
-        targetAmount: targetAmountWei.toString(),
+      setIsConfirming(false);
+      setIsConfirmed(false);
+
+      // Step 1: Create circle in database FIRST to get UUID
+      groveToast.info("Creating circle in database...");
+
+      const dbResponse = await fetch("/api/circles", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          description: formData.description,
+          targetAmount: targetAmountWei.toString(),
+          paymentType: formData.paymentType,
+          fixedAmount: fixedAmountWei.toString(),
+          deadline: deadlineTimestamp.toString(),
+          ownerWallet: address,
+          ownerEmail: user?.email || `${address}@grove.temp`, // Use Dynamic email or fallback
+        }),
       });
 
-      // Make sure user is on the correct network
-      console.log("About to call writeContract...");
+      if (!dbResponse.ok) {
+        throw new Error("Failed to create circle in database");
+      }
 
-      writeContract({
+      const dbData = await dbResponse.json();
+      const databaseCircleId = dbData.databaseId;
+
+      groveToast.info("Circle created in database, deploying to blockchain...");
+
+      // Step 2: Create circle on blockchain
+      // Contract parameters
+      const contributionAmount = BigInt(1); // Minimal amount
+      const interval = BigInt(86400); // 1 day
+      const goal = targetAmountWei;
+
+      // Send transaction using wagmi
+      const txHash = await writeContractAsync({
         address: GROVE_CONTRACT_ADDRESS,
         abi: GROVE_ABI,
         functionName: "createCircle",
-        args: [
-          formData.name,
-          formData.paymentType,
-          fixedAmountWei,
-          [address], // initialMembers array with the creator
-        ],
+        args: [formData.name, contributionAmount, interval, goal],
       });
 
-      // Reset form on success (will happen in useEffect when transaction confirms)
+      setHash(txHash);
+      setIsConfirming(true);
+
+      groveToast.info("Transaction sent, waiting for confirmation...");
+
+      // Step 3: Wait for confirmation and sync
+      setTimeout(async () => {
+        setIsConfirming(false);
+
+        try {
+          // Sync database with blockchain
+          const syncResponse = await fetch(
+            `/api/transaction/${txHash}?databaseCircleId=${databaseCircleId}`
+          );
+
+          if (syncResponse.ok) {
+            const syncData = await syncResponse.json();
+            if (syncData.synced) {
+              groveToast.success(
+                `Circle "${formData.name}" created successfully!`
+              );
+              setIsConfirmed(true);
+
+              // Reset form and redirect
+              setFormData({
+                name: "",
+                description: "",
+                targetAmount: "",
+                paymentType: PaymentType.OneTime,
+                fixedAmount: "",
+                deadline: "",
+              });
+
+              if (onSuccess) {
+                setTimeout(() => {
+                  onSuccess();
+                }, 1000);
+              }
+            } else {
+              groveToast.warning(
+                "Circle created but sync pending - check status later"
+              );
+            }
+          } else {
+            groveToast.warning(
+              "Circle created but failed to sync - check status later"
+            );
+          }
+        } catch (syncError) {
+          console.error("Sync error:", syncError);
+          groveToast.warning(
+            "Circle created but sync failed - check status later"
+          );
+        }
+      }, 5000);
     } catch (error) {
-      if (process.env.NODE_ENV === "development") {
-        console.error("Error creating circle:", error);
-      }
+      console.error("Circle creation error:", error);
       groveToast.error(
         "Failed to create circle. Please check your wallet and try again."
       );
@@ -410,11 +377,10 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
         )}
 
         {/* Error Messages */}
-        {(writeError || receiptError) && (
+        {writeError && (
           <div className='bg-red-500/20 border border-red-500/30 rounded-lg p-4'>
             <p className='text-red-200 text-sm'>
-              <strong>Error:</strong>{" "}
-              {writeError?.message || receiptError?.message}
+              <strong>Error:</strong> {writeError?.message}
             </p>
           </div>
         )}

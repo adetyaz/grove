@@ -132,8 +132,8 @@ export default function InvitePage() {
         await writeContract({
           address: GROVE_CONTRACT_ADDRESS,
           abi: GROVE_ABI,
-          functionName: "addMember",
-          args: [BigInt(invitation!.circleId), address as `0x${string}`],
+          functionName: "joinCircle",
+          args: [BigInt(invitation!.circleId)],
         });
 
         // Success will be handled by the transaction confirmation

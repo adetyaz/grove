@@ -205,7 +205,6 @@ export const notificationService = {
       const { sendEmail, emailTemplates } = await import("./email");
       const emailTemplate = emailTemplates.circleInvitation(invitation);
       const emailResult = await sendEmail(
-        invitation.inviterEmail,
         invitation.recipientEmail,
         emailTemplate
       );
@@ -296,11 +295,7 @@ export const notificationService = {
           html: `<p>${update.details}</p><p><a href="${update.circleLink}">View Circle</a></p>`,
           text: `${update.details}\n\nView Circle: ${update.circleLink}`,
         };
-        const emailResult = await sendEmail(
-          update.senderEmail,
-          recipient.email,
-          emailTemplate
-        );
+        const emailResult = await sendEmail(recipient.email, emailTemplate);
         recipientResults.email = {
           success: emailResult.success,
           error: emailResult.error || null,
@@ -360,13 +355,174 @@ export const notificationService = {
     if (testEmail) {
       try {
         const { verifyEmailConnection } = await import("./email");
-        results.email = await verifyEmailConnection(testEmail);
+        results.email = await verifyEmailConnection();
       } catch (error) {
         console.error("Email test failed:", error);
       }
     }
 
     return results;
+  },
+};
+
+// Helper functions for circle-specific notifications
+export const circleNotifications = {
+  // Send circle creation success notification
+  sendCircleCreated: async (circle: {
+    id: string; // UUID
+    name: string;
+    onChainId: number | null;
+    owner: {
+      email: string;
+      name?: string;
+      wallet: string;
+    };
+    members: Array<{
+      email: string;
+      name?: string;
+      wallet: string;
+    }>;
+  }) => {
+    const circleLink = `${process.env.NEXT_PUBLIC_APP_URL}/circles/${circle.id}`;
+    const details = circle.onChainId
+      ? `Circle "${circle.name}" has been created successfully! 🎉\n\nContract ID: ${circle.onChainId}\nMembers can now join and contribute.`
+      : `Circle "${circle.name}" has been created! ⏳\n\nContract deployment in progress. You'll be notified when it's ready for contributions.`;
+
+    return await notificationService.sendCircleUpdate({
+      recipients: [circle.owner, ...circle.members].map((member) => ({
+        email: member.email,
+        // TODO: Add telegram/whatsapp from user preferences
+      })),
+      senderEmail: circle.owner.email,
+      circleName: circle.name,
+      updateType: "member_joined",
+      details,
+      circleLink,
+    });
+  },
+
+  // Send circle sync success notification
+  sendCircleSynced: async (circle: {
+    id: string; // UUID
+    name: string;
+    onChainId: number;
+    owner: {
+      email: string;
+      name?: string;
+    };
+    members: Array<{
+      email: string;
+      name?: string;
+    }>;
+  }) => {
+    const circleLink = `${process.env.NEXT_PUBLIC_APP_URL}/circles/${circle.id}`;
+    const details = `🎉 Great news! Circle "${circle.name}" is now live on the blockchain!\n\nContract ID: ${circle.onChainId}\nMembers can now make contributions and join the circle.`;
+
+    return await notificationService.sendCircleUpdate({
+      recipients: [circle.owner, ...circle.members].map((member) => ({
+        email: member.email,
+      })),
+      senderEmail: circle.owner.email,
+      circleName: circle.name,
+      updateType: "goal_reached", // Using this for sync success
+      details,
+      circleLink,
+    });
+  },
+
+  // Send member joined notification
+  sendMemberJoined: async (
+    circle: {
+      id: string; // UUID
+      name: string;
+      onChainId: number | null;
+    },
+    newMember: {
+      email: string;
+      name?: string;
+      wallet: string;
+    },
+    existingMembers: Array<{
+      email: string;
+      name?: string;
+    }>
+  ) => {
+    const circleLink = `${process.env.NEXT_PUBLIC_APP_URL}/circles/${circle.id}`;
+    const memberName = newMember.name || newMember.wallet.slice(0, 8) + "...";
+    const details = `👥 ${memberName} has joined the circle!`;
+
+    return await notificationService.sendCircleUpdate({
+      recipients: existingMembers.map((member) => ({
+        email: member.email,
+      })),
+      senderEmail: newMember.email,
+      circleName: circle.name,
+      updateType: "member_joined",
+      details,
+      circleLink,
+    });
+  },
+
+  // Send contribution notification
+  sendContribution: async (
+    circle: {
+      id: string; // UUID
+      name: string;
+      onChainId: number | null;
+    },
+    contributor: {
+      email: string;
+      name?: string;
+      wallet: string;
+    },
+    amount: string,
+    recipients: Array<{
+      email: string;
+      name?: string;
+    }>
+  ) => {
+    const circleLink = `${process.env.NEXT_PUBLIC_APP_URL}/circles/${circle.id}`;
+    const contributorName =
+      contributor.name || contributor.wallet.slice(0, 8) + "...";
+    const details = `💰 ${contributorName} contributed ${amount} BTC to the circle!`;
+
+    return await notificationService.sendCircleUpdate({
+      recipients: recipients.map((member) => ({
+        email: member.email,
+      })),
+      senderEmail: contributor.email,
+      circleName: circle.name,
+      updateType: "contribution",
+      details,
+      circleLink,
+    });
+  },
+
+  // Send invitation with UUID-based links
+  sendInvitation: async (invitation: {
+    circleId: string; // UUID
+    circleName: string;
+    inviterName: string;
+    inviterEmail: string;
+    inviterAddress: string;
+    recipientEmail: string;
+    recipientTelegram?: string;
+    recipientWhatsApp?: string;
+    circleDescription?: string;
+  }) => {
+    const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/circles/${invitation.circleId}/join`;
+
+    return await notificationService.sendInvitation({
+      recipientEmail: invitation.recipientEmail,
+      recipientTelegram: invitation.recipientTelegram,
+      recipientWhatsApp: invitation.recipientWhatsApp,
+      inviterName: invitation.inviterName,
+      inviterAddress: invitation.inviterAddress,
+      inviterEmail: invitation.inviterEmail,
+      circleName: invitation.circleName,
+      inviteLink,
+      circleDescription: invitation.circleDescription,
+    });
   },
 };
 

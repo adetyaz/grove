@@ -1,10 +1,28 @@
-import { type Address } from "viem";
-import GroveABI from "./grove.json";
+export const SATVAULT_CONTRACT_ADDRESS =
+  "0x4C6Caf189d5dbF9fb201556dDcC027F0562598F6";
+export const GROVE_CONTRACT_ADDRESS =
+  "0xd6f967aCcf922dECf0d293625223F63b23055d15";
+export const GIFTENGINE_CONTRACT_ADDRESS =
+  "0x63c49617df7211cab09418978a63c9d010189d2c";
+export const ACHIEVEMENTNFT_CONTRACT_ADDRESS =
+  "0x7033d1dadf5cbe03c63be515af72916918bb5863";
+export const INHERITANCEMODULE_CONTRACT_ADDRESS =
+  "0x70a84d0910584e77dc7f42ea2fe99f4a0a5cc028";
 
-// Grove Contract Configuration
-export const GROVE_CONTRACT_ADDRESS: Address =
-  "0xdcEcd3Cf494069f9FB5614e05Efa4Fa45C4f949c";
-export const GROVE_ABI = GroveABI;
+import SATVAULT_ABI from "@/contracts/ABIs/SatVault.json";
+import GROVE_ABI from "@/contracts/ABIs/Grove.json";
+import GIFTENGINE_ABI from "@/contracts/ABIs/GiftEngine.json";
+import ACHIEVEMENTNFT_ABI from "@/contracts/ABIs/AchievementNFT.json";
+import INHERITANCEMODULE_ABI from "@/contracts/ABIs/InheritanceModule.json";
+
+export {
+  SATVAULT_ABI,
+  GROVE_ABI,
+  GIFTENGINE_ABI,
+  ACHIEVEMENTNFT_ABI,
+  INHERITANCEMODULE_ABI,
+};
+import { type Address } from "viem";
 
 // Citrea Network Configuration
 export const CITREA_TESTNET = {

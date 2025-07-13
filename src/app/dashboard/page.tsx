@@ -1,7 +1,7 @@
 "use client";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +25,8 @@ export default function DashboardPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [waitingForAutoConnect, setWaitingForAutoConnect] = useState(true);
+  const autoConnectTimeout = useRef<NodeJS.Timeout | null>(null);
   const { dashboardData, loading } = useDashboardData();
 
   // Memoize connection state
@@ -38,14 +40,20 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setMounted(true);
+    // Wait for auto-connect (2.5s), then allow redirect if still not connected
+    autoConnectTimeout.current = setTimeout(() => {
+      setWaitingForAutoConnect(false);
+    }, 2500);
+    return () => {
+      if (autoConnectTimeout.current) clearTimeout(autoConnectTimeout.current);
+    };
   }, []);
 
-  // Redirect to home if not connected - use memoized state
   useEffect(() => {
-    if (mounted && !connectionState.isConnected) {
+    if (mounted && !waitingForAutoConnect && !connectionState.isConnected) {
       router.push("/");
     }
-  }, [mounted, connectionState.isConnected, router]);
+  }, [mounted, waitingForAutoConnect, connectionState.isConnected, router]);
 
   // Memoize the copy handler to prevent re-renders
   const handleCopyAddress = useCallback(() => {
@@ -57,10 +65,15 @@ export default function DashboardPage() {
   }, [connectionState.address]);
 
   // Prevent hydration mismatch
-  if (!mounted) {
-    return null;
+  if (!mounted || (waitingForAutoConnect && !connectionState.isConnected)) {
+    // Show a loading spinner while waiting for auto-connect
+    return (
+      <div className='flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900'>
+        <div className='animate-spin rounded-full h-12 w-12 border-b-4 border-green-500 mb-6'></div>
+        <p className='text-white text-lg'>Waiting for wallet connection...</p>
+      </div>
+    );
   }
-
   if (!connectionState.isConnected) {
     return null;
   }
@@ -138,14 +151,14 @@ export default function DashboardPage() {
               <CardContent className='p-6'>
                 <div className='flex items-center justify-between'>
                   <div>
-                    <p className='text-blue-200 text-sm font-medium'>
+                    <p className='text-blue-600 text-sm font-medium'>
                       My Circles
                     </p>
                     <p className='text-2xl font-bold text-white'>
                       {loading ? "..." : dashboardData.totalCircles}
                     </p>
                   </div>
-                  <Users className='w-8 h-8 text-blue-400' />
+                  <Users className='w-8 h-8 text-blue-600' />
                 </div>
               </CardContent>
             </Card>
@@ -287,7 +300,7 @@ export default function DashboardPage() {
                 </Button>
                 <Button
                   variant='outline'
-                  className='w-full border-blue-500 text-blue-300 hover:bg-blue-500 hover:text-white'
+                  className='w-full border-blue-500 text-blue-600 hover:bg-blue-500 hover:text-white'
                   onClick={() => alert("Gifting feature coming soon!")}
                 >
                   <Gift className='w-4 h-4 mr-2' />
@@ -300,7 +313,7 @@ export default function DashboardPage() {
             <Card className='bg-gray-800 border-gray-700'>
               <CardHeader>
                 <CardTitle className='text-white flex items-center'>
-                  <Clock className='w-5 h-5 mr-2 text-blue-400' />
+                  <Clock className='w-5 h-5 mr-2 text-blue-600' />
                   Recent Activity
                 </CardTitle>
               </CardHeader>

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import ConnectedUserSection from "@/components/connected-user-section";
 import WalletButton from "@/components/wallet-button";
+
 import { Shield, Users, Star, Menu, Target, Zap, Globe } from "lucide-react";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { useState, useEffect, useMemo } from "react";
@@ -149,6 +150,26 @@ export default function Home() {
 
       {/* Connected User Dashboard - Shows when wallet is connected */}
       <ConnectedUserSection />
+
+      {/* Development Testing - Only in dev mode */}
+      {process.env.NODE_ENV === "development" && (
+        <section className='px-4 lg:px-8 py-8'>
+          <div className='max-w-7xl mx-auto'>
+            <div className='bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-6'>
+              <h3 className='text-yellow-400 font-semibold mb-2'>
+                🧪 Development Testing
+              </h3>
+              <p className='text-yellow-300/80 text-sm'>
+                These components are only visible in development mode for
+                testing.
+              </p>
+            </div>
+            <div className='flex justify-center'>
+              {/* <EmailQuickTest /> */}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Features Grid */}
       <section id='features' className='px-4 lg:px-8 py-16'>
@@ -314,10 +335,10 @@ export default function Home() {
                 <div className='relative'>
                   <div className='bg-gray-900 rounded-lg p-6 text-center'>
                     <div className='w-24 h-24 mx-auto mb-4 relative'>
-                      <Shield className='w-full h-full text-blue-400' />
+                      <Shield className='w-full h-full text-blue-600' />
                     </div>
                     <div className='text-orange-500 font-bold'>₿ Protected</div>
-                    <div className='text-blue-400'>ZK-Proof Secured</div>
+                    <div className='text-blue-600'>ZK-Proof Secured</div>
                   </div>
                 </div>
               </CardContent>

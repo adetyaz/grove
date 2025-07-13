@@ -2,10 +2,14 @@
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { useEffect, useState } from "react";
 import CircleDashboard from "./circle-dashboard";
-import EmailTestComponent from "./email-test";
+import Leaderboard from "./leaderboard";
+import ContributionHistory from "./contribution-history";
+import { useDashboardData } from "@/hooks/useDashboardData";
+// import EmailTestComponent from "./email-test";
 import { groveToast } from "@/lib/toast";
 
 export default function ConnectedUserSection() {
+  const { dashboardData, loading, refresh } = useDashboardData();
   const { user, primaryWallet } = useDynamicConnection();
   const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -35,7 +39,6 @@ export default function ConnectedUserSection() {
   if (!isConnected) {
     return null; // Don't show anything when wallet is not connected
   }
-
   return (
     <section className='bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 py-20'>
       <div className='max-w-7xl mx-auto px-4 lg:px-8'>
@@ -77,131 +80,41 @@ export default function ConnectedUserSection() {
           </div>
         </div>
 
-        <CircleDashboard />
+        {/* Main Dashboard Section */}
+        <CircleDashboard
+          dashboardData={dashboardData}
+          loading={loading}
+          refresh={refresh}
+        />
 
-        {/* Email Test Component - Development Only */}
-        {process.env.NODE_ENV === "development" && (
-          <div className='mt-8'>
-            <div className='max-w-md mx-auto'>
-              <EmailTestComponent />
-            </div>
-          </div>
-        )}
+        {/* Leaderboard Section */}
+        <div className='mt-12'>
+          <Leaderboard
+            entries={dashboardData.circles.map((circle) => ({
+              address: circle.creator,
+              name: circle.name,
+              totalContributed: circle.currentAmount,
+              circlesCount: 1,
+              rank: 1, // TODO: Calculate real rank
+              isCurrentUser: circle.creator === address,
+            }))}
+            userAddress={address || ""}
+          />
+        </div>
 
-        <div className='mt-16'>
-          <div className='grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12'>
-            {/* Fund Your Goals Card */}
-            <div className='group bg-gradient-to-br from-green-500/20 to-green-600/20 backdrop-blur-sm rounded-2xl p-8 border border-green-500/30 hover:border-green-400/50 transition-all duration-300 transform hover:scale-105'>
-              <div className='text-center'>
-                <div className='w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300'>
-                  <span className='text-2xl'>🌱</span>
-                </div>
-                <h3 className='text-xl font-bold text-white mb-3'>
-                  Fund Your Goals
-                </h3>
-                <p className='text-gray-300 text-sm mb-6 leading-relaxed'>
-                  Start funding your savings circles and watch your Bitcoin grow
-                  through collaborative saving.
-                </p>
-                <button
-                  className='w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-3 px-4 rounded-lg font-semibold transition-all duration-200 transform hover:scale-[1.02] shadow-lg'
-                  onClick={() => {
-                    // TODO: Implement contribution flow
-                    alert(
-                      "Contribution feature coming soon! For now, you can create circles and invite members."
-                    );
-                  }}
-                >
-                  Fund Goals
-                </button>
-              </div>
-            </div>
-
-            {/* Dashboard Navigation Card */}
-            <div className='group bg-gradient-to-br from-orange-500/20 to-orange-600/20 backdrop-blur-sm rounded-2xl p-8 border border-orange-500/30 hover:border-orange-400/50 transition-all duration-300 transform hover:scale-105'>
-              <div className='text-center'>
-                <div className='w-16 h-16 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300'>
-                  <span className='text-2xl'>📊</span>
-                </div>
-                <h3 className='text-xl font-bold text-white mb-3'>
-                  Your Dashboard
-                </h3>
-                <p className='text-gray-300 text-sm mb-6 leading-relaxed'>
-                  Access your complete Grove dashboard with detailed analytics,
-                  circle management, and progress tracking.
-                </p>
-                <a
-                  href='/dashboard'
-                  className='inline-block w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-3 px-4 rounded-lg font-semibold transition-all duration-200 transform hover:scale-[1.02] shadow-lg'
-                >
-                  Go to Dashboard
-                </a>
-              </div>
-            </div>
-
-            {/* Build Your Network Card */}
-            <div className='group bg-gradient-to-br from-blue-500/20 to-blue-600/20 backdrop-blur-sm rounded-2xl p-8 border border-blue-500/30 hover:border-blue-400/50 transition-all duration-300 transform hover:scale-105'>
-              <div className='text-center'>
-                <div className='w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300'>
-                  <span className='text-2xl'>🤝</span>
-                </div>
-                <h3 className='text-xl font-bold text-white mb-3'>
-                  Build Your Network
-                </h3>
-                <p className='text-gray-300 text-sm mb-6 leading-relaxed'>
-                  Expand your savings network by connecting with friends and
-                  family who share your financial ambitions.
-                </p>
-                <button
-                  className='w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-3 px-4 rounded-lg font-semibold transition-all duration-200 transform hover:scale-[1.02] shadow-lg'
-                  onClick={() => {
-                    // Navigate to create page to invite members to existing circles
-                    window.location.href = "/create";
-                  }}
-                >
-                  Expand Network
-                </button>
-              </div>
-            </div>
-
-            {/* Track Progress Card */}
-            <div className='group bg-gradient-to-br from-purple-500/20 to-purple-600/20 backdrop-blur-sm rounded-2xl p-8 border border-purple-500/30 hover:border-purple-400/50 transition-all duration-300 transform hover:scale-105'>
-              <div className='text-center'>
-                <div className='w-16 h-16 bg-gradient-to-br from-purple-400 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300'>
-                  <span className='text-2xl'>📊</span>
-                </div>
-                <h3 className='text-xl font-bold text-white mb-3'>
-                  Track Progress
-                </h3>
-                <p className='text-gray-300 text-sm mb-6 leading-relaxed'>
-                  Monitor your savings journey with detailed analytics,
-                  milestones, and community leaderboards.
-                </p>
-                <button
-                  className='w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white py-3 px-4 rounded-lg font-semibold transition-all duration-200 transform hover:scale-[1.02] shadow-lg'
-                  onClick={() => {
-                    // TODO: Implement analytics page
-                    alert(
-                      "Analytics dashboard coming soon! Your progress data will unlock detailed insights and achievements."
-                    );
-                  }}
-                >
-                  View Analytics
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Development Status Banner */}
-          <div className='text-center'>
-            <div className='inline-flex items-center bg-orange-500/20 border border-orange-500/30 rounded-full px-6 py-3'>
-              <span className='text-orange-300 mr-2'>🚀</span>
-              <span className='text-sm text-orange-200 font-medium'>
-                Grove is growing! New features are being planted regularly to
-                enhance your savings experience.
-              </span>
-            </div>
-          </div>
+        {/* Recent Activity Section */}
+        <div className='mt-12'>
+          <ContributionHistory
+            contributions={dashboardData.circles.flatMap((circle) => [
+              {
+                id: `${circle.id}-latest`,
+                contributor: circle.creator,
+                amount: circle.currentAmount.toString(),
+                timestamp: new Date().toISOString(), // TODO: Use real timestamp
+                txHash: undefined, // TODO: Use real txHash
+              },
+            ])}
+          />
         </div>
       </div>
     </section>

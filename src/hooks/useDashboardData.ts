@@ -6,7 +6,8 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { formatEther } from "viem";
 
 interface Circle {
-  id: number;
+  id: string; // Changed to string for UUID
+  onChainId: number; // Contract ID for blockchain calls
   name: string;
   description?: string;
   targetAmount: bigint;
@@ -74,39 +75,45 @@ export function useDashboardData() {
       const dbData = await dbResponse.json();
 
       if (dbData.circles && dbData.circles.length > 0) {
-        // Map database circles to our Circle interface - optimize by avoiding repeated operations
-        const dbCircles: Circle[] = dbData.circles.map(
-          (circle: {
-            id: number;
-            onChainId?: number;
-            name: string;
-            description?: string;
-            targetAmount: string;
-            deadline: string;
-            owner: { wallet: string };
-            members: Array<{ wallet: string }>;
-            invitations: Array<unknown>;
-          }) => {
+        // Map database circles to our Circle interface
+        const dbCircles = await Promise.all(
+          dbData.circles.map(async (circle: any) => {
             const targetAmount = BigInt(circle.targetAmount);
             const deadline = BigInt(
               Math.floor(new Date(circle.deadline).getTime() / 1000)
             );
-            const memberWallets = circle.members.map((m) => m.wallet);
+            const memberWallets = circle.members.map((m: any) => m.wallet);
             const allMembers = [circle.owner.wallet, ...memberWallets];
 
+            // Fetch currentAmount from contract if circle is synced
+            let currentAmount = BigInt(0);
+            try {
+              if (circle.onChainId) {
+                const onChain = await import("@/lib/grove-contract").then((m) =>
+                  m.groveContract.getCircle(circle.onChainId)
+                );
+                if (onChain && typeof onChain.currentAmount === "bigint") {
+                  currentAmount = onChain.currentAmount;
+                }
+              }
+            } catch {
+              // fallback to 0 if contract call fails
+            }
+
             return {
-              id: circle.onChainId || circle.id,
+              id: circle.id, // Use UUID as primary ID
+              onChainId: circle.onChainId, // Include contract ID separately
               name: circle.name,
               description: circle.description,
               targetAmount,
-              currentAmount: BigInt("0"), // Will be fetched from blockchain later if needed
+              currentAmount,
               deadline,
               isActive: true,
               memberCount: allMembers.length + circle.invitations.length,
               members: allMembers,
               creator: circle.owner.wallet,
             };
-          }
+          })
         );
 
         // Calculate stats efficiently

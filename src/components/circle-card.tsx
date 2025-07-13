@@ -21,10 +21,14 @@ import {
 } from "@/hooks/useDashboardData";
 import InviteForm from "./invite-form";
 import ContributeForm from "./contribute-form";
+import { useWriteContract } from "wagmi";
+import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/contracts/constants";
+import { groveToast } from "@/lib/toast";
 
 interface CircleCardProps {
   circle: {
-    id: number;
+    id: string; // Changed to string for UUID
+    onChainId: number; // Contract ID for blockchain calls
     name: string;
     description?: string;
     targetAmount: bigint;
@@ -48,10 +52,44 @@ export default function CircleCard({
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showContributeModal, setShowContributeModal] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
+
+  const { writeContractAsync } = useWriteContract();
 
   const progress = calculateProgress(circle.currentAmount, circle.targetAmount);
   const isCreator = circle.creator.toLowerCase() === userAddress.toLowerCase();
+  const isMember = circle.members.some(
+    (member) => member.toLowerCase() === userAddress.toLowerCase()
+  );
   const isGoalReached = circle.currentAmount >= circle.targetAmount;
+
+  const handleJoinCircle = async () => {
+    if (isJoining) return;
+
+    try {
+      setIsJoining(true);
+      const txHash = await writeContractAsync({
+        address: GROVE_CONTRACT_ADDRESS,
+        abi: GROVE_ABI,
+        functionName: "joinCircle",
+        args: [BigInt(circle.id)],
+      });
+
+      groveToast.transactionPending(txHash);
+      groveToast.success("Successfully joined the circle!");
+
+      // Refresh the data
+      if (onUpdate) {
+        setTimeout(onUpdate, 2000); // Wait a bit for the transaction to be mined
+      }
+    } catch (error: any) {
+      groveToast.error(
+        `Failed to join circle: ${error.message || "Unknown error"}`
+      );
+    } finally {
+      setIsJoining(false);
+    }
+  };
 
   const handleCardClick = () => {
     router.push(`/circles/${circle.id}`);
@@ -74,6 +112,18 @@ export default function CircleCard({
                   <span className='inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-500/20 text-orange-300 border border-orange-500/30'>
                     <Crown className='w-3 h-3 mr-1' />
                     Creator
+                  </span>
+                )}
+                {!isCreator && isMember && (
+                  <span className='inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-300 border border-green-500/30'>
+                    <Users className='w-3 h-3 mr-1' />
+                    Member
+                  </span>
+                )}
+                {!isMember && (
+                  <span className='inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-500/20 text-gray-300 border border-gray-500/30'>
+                    <Clock className='w-3 h-3 mr-1' />
+                    Not a Member
                   </span>
                 )}
                 <ExternalLink className='w-4 h-4 text-gray-400 group-hover:text-orange-300 transition-colors' />
@@ -197,17 +247,32 @@ export default function CircleCard({
 
           {/* Action Buttons */}
           <div className='grid grid-cols-2 gap-3'>
-            <Button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowContributeModal(true);
-              }}
-              className='bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
-              disabled={!circle.isActive}
-            >
-              <Wallet className='w-4 h-4 mr-2' />
-              Contribute
-            </Button>
+            {isMember ? (
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowContributeModal(true);
+                }}
+                className='bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
+                disabled={!circle.isActive}
+              >
+                <Wallet className='w-4 h-4 mr-2' />
+                Contribute
+              </Button>
+            ) : (
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleJoinCircle();
+                }}
+                variant='outline'
+                className='border-orange-500 text-orange-300 hover:bg-orange-500 hover:text-white'
+                disabled={!circle.isActive || isJoining}
+              >
+                <UserPlus className='w-4 h-4 mr-2' />
+                {isJoining ? "Joining..." : "Join Circle"}
+              </Button>
+            )}
             <Button
               onClick={(e) => {
                 e.stopPropagation();
@@ -230,7 +295,7 @@ export default function CircleCard({
                 Goal Achieved
               </span>
             ) : circle.isActive ? (
-              <span className='inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30'>
+              <span className='inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-500/20 text-blue-600 border border-blue-500/30'>
                 <Plus className='w-4 h-4 mr-1' />
                 Active
               </span>
@@ -259,6 +324,7 @@ export default function CircleCard({
       {showContributeModal && (
         <ContributeForm
           circleId={circle.id}
+          onChainId={circle.onChainId}
           circleName={circle.name}
           onClose={() => setShowContributeModal(false)}
           onSuccess={() => {

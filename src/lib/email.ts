@@ -1,24 +1,21 @@
 import nodemailer from "nodemailer";
 
-// Create email transporter with dynamic user configuration
-export const createEmailTransporter = (userEmail: string) => {
+// Create email transporter using static Gmail config (matches working Nerowork setup)
+export const createEmailTransporter = () => {
   const emailConfig = {
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: parseInt(process.env.SMTP_PORT || "587"),
-    secure: process.env.SMTP_SECURE === "true", // true for 465, false for other ports
+    service: "gmail",
     auth: {
-      user: userEmail, // Use the sender's email from Dynamic
+      user: process.env.SMTP_USER, // Gmail address (must match app password)
       pass: process.env.GMAIL_APP_PASSWORD, // Gmail app password
     },
-    // Additional configuration for better reliability
-    connectionTimeout: 60000, // 60 seconds
-    greetingTimeout: 30000, // 30 seconds
-    socketTimeout: 60000, // 60 seconds
+    connectionTimeout: 60000,
+    greetingTimeout: 30000,
+    socketTimeout: 60000,
   };
 
-  if (!userEmail || !process.env.GMAIL_APP_PASSWORD) {
+  if (!process.env.SMTP_USER || !process.env.GMAIL_APP_PASSWORD) {
     console.warn(
-      "⚠️ Email configuration missing. User email or Gmail app password not available"
+      "⚠️ Email configuration missing. SMTP_USER or Gmail app password not available"
     );
     return null;
   }
@@ -32,14 +29,17 @@ export const createEmailTransporter = (userEmail: string) => {
 };
 
 // Verify connection configuration
-export const verifyEmailConnection = async (userEmail: string) => {
+export const verifyEmailConnection = async () => {
   try {
-    const transporter = createEmailTransporter(userEmail);
+    const transporter = createEmailTransporter();
     if (!transporter) {
       return false;
     }
     await transporter.verify();
-    console.log("✅ Email server is ready to send messages for:", userEmail);
+    console.log(
+      "✅ Email server is ready to send messages for:",
+      process.env.SMTP_USER
+    );
     return true;
   } catch (error) {
     console.error("❌ Email server configuration error:", error);
@@ -207,18 +207,17 @@ This is a test email from Grove - Bitcoin Collaboration Platform
 
 // Send email function
 export const sendEmail = async (
-  senderEmail: string,
   to: string,
   template: { subject: string; html: string; text: string }
 ) => {
   try {
-    const transporter = createEmailTransporter(senderEmail);
+    const transporter = createEmailTransporter();
     if (!transporter) {
       return { success: false, error: "Email transporter not available" };
     }
 
     const info = await transporter.sendMail({
-      from: `"Grove 🌳" <${senderEmail}>`,
+      from: `"Grove 🌳" <${process.env.SMTP_USER}>`,
       to,
       subject: template.subject,
       text: template.text,

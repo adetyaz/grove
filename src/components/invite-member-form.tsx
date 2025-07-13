@@ -22,6 +22,8 @@ interface InviteEntry {
   error?: string;
 }
 
+import { groveContract } from "@/lib/grove-contract";
+
 export default function InviteMemberForm({
   circleId,
   circleName,
@@ -91,11 +93,12 @@ export default function InviteMemberForm({
 
     setIsSubmitting(true);
 
-    // Process each invitation
+    // Import groveContract at the top, Address type is not needed here
+    // (already imported at the top if needed)
+
     for (const invite of invites) {
       if (invite.status !== "pending") continue;
 
-      // Update status to sending
       setInvites((prev) =>
         prev.map((inv) =>
           inv.id === invite.id ? { ...inv, status: "sending" } : inv
@@ -118,23 +121,43 @@ export default function InviteMemberForm({
           body: JSON.stringify(payload),
         });
 
-        if (response.ok) {
+        let onChainSuccess = false;
+        let onChainError = null;
+
+        // If wallet invite, add on-chain
+        if (invite.type === "wallet" && response.ok) {
+          try {
+            // Use the connected wallet address as the sender
+            const account = invite.value as `0x${string}`;
+            const simulation = await groveContract.simulateAddMember(
+              { circleId, newMember: account },
+              account
+            );
+            const { request } = simulation;
+            const publicClient = (groveContract as any).publicClient;
+            await publicClient.writeContract(request);
+            onChainSuccess = true;
+          } catch (err: any) {
+            onChainError = err;
+            console.error("On-chain addMember error:", err);
+          }
+        }
+
+        if (response.ok && (invite.type !== "wallet" || onChainSuccess)) {
           setInvites((prev) =>
             prev.map((inv) =>
               inv.id === invite.id ? { ...inv, status: "sent" } : inv
             )
           );
-
-          // Show success toast for each invite
           if (invite.type === "email") {
             groveToast.invitationSent(invite.value);
           } else {
             groveToast.success(
-              `Invitation sent to ${invite.value.slice(0, 6)}...${invite.value.slice(-4)}`
+              `Invitation sent and member added on-chain: ${invite.value.slice(0, 6)}...${invite.value.slice(-4)}`
             );
           }
         } else {
-          const errorData = await response.json();
+          const errorData = response.ok ? { error: onChainError?.message || "Failed to add on-chain" } : await response.json();
           setInvites((prev) =>
             prev.map((inv) =>
               inv.id === invite.id

@@ -7,6 +7,7 @@ import {
   getEventSelector,
 } from "viem";
 import { CITREA_TESTNET } from "@/contracts/constants";
+import ContractSyncService from "@/lib/contract-sync";
 
 // Create a public client for reading blockchain data
 const publicClient = createPublicClient({
@@ -20,6 +21,8 @@ export async function GET(
 ) {
   try {
     const hash = params.hash as `0x${string}`;
+    const { searchParams } = new URL(request.url);
+    const databaseCircleId = searchParams.get("databaseCircleId");
 
     // Get transaction receipt
     const receipt = await publicClient.getTransactionReceipt({ hash });
@@ -60,12 +63,24 @@ export async function GET(
       }
     }
 
+    // If we have a databaseCircleId, sync it with the contract
+    if (databaseCircleId && circleId) {
+      console.log(
+        `🔄 Auto-syncing circle ${databaseCircleId} with onChainId ${circleId}`
+      );
+      await ContractSyncService.syncCircleFromTransaction(
+        hash,
+        databaseCircleId
+      );
+    }
+
     return Response.json({
       success: true,
       transactionHash: hash,
       circleId,
-      blockNumber: receipt.blockNumber,
+      blockNumber: Number(receipt.blockNumber),
       gasUsed: receipt.gasUsed.toString(),
+      synced: !!databaseCircleId,
     });
   } catch (error) {
     console.error("Error fetching transaction:", error);

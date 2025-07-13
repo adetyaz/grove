@@ -10,7 +10,8 @@
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "set-grove": "node set-grove-address.mjs"
   },
   "dependencies": {
     "@dynamic-labs/ethereum": "^4.20.9",

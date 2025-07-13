@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
 
     // First verify the connection
     console.log("🔍 Verifying email connection...");
-    const connectionValid = await verifyEmailConnection(senderEmail);
+    const connectionValid = await verifyEmailConnection();
 
     if (!connectionValid) {
       return NextResponse.json(
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("📤 Sending test email...");
-    const result = await sendEmail(senderEmail, recipientEmail, emailTemplate);
+    const result = await sendEmail(recipientEmail, emailTemplate);
 
     if (result.success) {
       console.log("✅ Test email sent successfully!");

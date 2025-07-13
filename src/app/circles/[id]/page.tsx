@@ -27,13 +27,15 @@ import {
 } from "lucide-react";
 
 interface CircleData {
-  id: number;
+  id: string; // UUID from database
+  onChainId: number; // Contract ID for blockchain calls
   name: string;
   description?: string;
   targetAmount: bigint;
   currentAmount: bigint;
   deadline: bigint;
   isActive: boolean;
+  syncStatus: string;
   memberCount: number;
   members: string[];
   creator: string;
@@ -79,9 +81,13 @@ export default function CircleDetailPage() {
         setLoading(true);
         const response = await fetch(`/api/circles/${circleId}`);
         const data = await response.json();
-
-        if (response.ok) {
-          setCircle(data.circle);
+        // Accept both { ...circle fields ... } and { circle: { ... } }
+        if (
+          response.ok &&
+          data &&
+          (data.id || (data.circle && data.circle.id))
+        ) {
+          setCircle(data.circle ? data.circle : data);
         } else {
           setError(data.error || "Circle not found");
         }
@@ -108,18 +114,32 @@ export default function CircleDetailPage() {
     }
   };
 
-  const formatBTCAmount = (amount: bigint) => {
-    return `${(Number(amount) / 1e18).toFixed(6)} BTC`;
+  const formatBTCAmount = (amount: bigint | string) => {
+    // Accepts both string and bigint
+    const n = typeof amount === "string" ? BigInt(amount) : amount;
+    return `${(Number(n) / 1e18).toFixed(6)} BTC`;
   };
 
-  const calculateProgress = (current: bigint, target: bigint) => {
-    if (target === BigInt(0)) return 0;
-    return (Number(current) / Number(target)) * 100;
+  const calculateProgress = (
+    current: bigint | string,
+    target: bigint | string
+  ) => {
+    const c = typeof current === "string" ? BigInt(current) : current;
+    const t = typeof target === "string" ? BigInt(target) : target;
+    if (t === BigInt(0)) return 0;
+    return (Number(c) / Number(t)) * 100;
   };
 
-  const formatDeadline = (deadline: bigint) => {
-    const date = new Date(Number(deadline) * 1000);
-    return date.toLocaleDateString();
+  const formatDeadline = (deadline: bigint | string) => {
+    let ts =
+      typeof deadline === "string" ? parseInt(deadline) : Number(deadline);
+    if (ts > 1e12) ts = Math.floor(ts / 1000); // convert ms to s if needed
+    const date = new Date(ts * 1000);
+    return date.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
   };
 
   if (loading) {
@@ -257,7 +277,12 @@ export default function CircleDetailPage() {
                   </span>
                   <span className='text-gray-400'>
                     {formatBTCAmount(
-                      circle.targetAmount - circle.currentAmount
+                      (typeof circle.targetAmount === "string"
+                        ? BigInt(circle.targetAmount)
+                        : circle.targetAmount) -
+                        (typeof circle.currentAmount === "string"
+                          ? BigInt(circle.currentAmount)
+                          : circle.currentAmount)
                     )}{" "}
                     remaining
                   </span>
@@ -309,7 +334,7 @@ export default function CircleDetailPage() {
                 <Button
                   onClick={() => setShowInviteModal(true)}
                   variant='outline'
-                  className='w-full border-blue-500 text-blue-300 hover:bg-blue-500 hover:text-white'
+                  className='w-full border-blue-500 text-blue-600 hover:bg-blue-500 hover:text-white'
                   disabled={!isCreator}
                 >
                   <UserPlus className='w-4 h-4 mr-2' />
@@ -428,7 +453,12 @@ export default function CircleDetailPage() {
                         <span className='text-gray-400'>Remaining:</span>
                         <span className='text-white'>
                           {formatBTCAmount(
-                            circle.targetAmount - circle.currentAmount
+                            (typeof circle.targetAmount === "string"
+                              ? BigInt(circle.targetAmount)
+                              : circle.targetAmount) -
+                              (typeof circle.currentAmount === "string"
+                                ? BigInt(circle.currentAmount)
+                                : circle.currentAmount)
                           )}
                         </span>
                       </div>
@@ -522,6 +552,7 @@ export default function CircleDetailPage() {
       {showContributeModal && (
         <ContributeForm
           circleId={circle.id}
+          onChainId={circle.onChainId}
           circleName={circle.name}
           onClose={() => setShowContributeModal(false)}
           onSuccess={() => {
