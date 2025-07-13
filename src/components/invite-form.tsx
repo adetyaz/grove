@@ -42,6 +42,7 @@ export default function InviteForm({
   const [whatsapp, setWhatsapp] = useState("");
   const [personalMessage, setPersonalMessage] = useState("");
   const [activeTab, setActiveTab] = useState("email");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Service availability
   const [serviceStatus, setServiceStatus] = useState({
@@ -77,7 +78,12 @@ export default function InviteForm({
       return;
     }
 
+    setIsSubmitting(true);
+    
     try {
+      // Show initial loading toast
+      const loadingToastId = groveToast.loading("Preparing invitation...");
+
       const invitationData = {
         circleId, // Ensure the backend and InvitationData type support this
         recipientEmail: email,
@@ -87,12 +93,21 @@ export default function InviteForm({
         circleDescription: circleDescription || personalMessage || undefined,
       };
 
+      // Update loading message
+      groveToast.update(loadingToastId, { 
+        render: "Sending invitation...", 
+        type: "loading" 
+      });
+
       await sendInvitation(
         invitationData,
         user.email || user.username || "Grove User",
         primaryWallet.address,
         userEmail // Pass user's email from Dynamic
       );
+
+      // Dismiss loading toast
+      groveToast.dismiss(loadingToastId);
 
       // Reset form
       setEmail("");
@@ -105,6 +120,8 @@ export default function InviteForm({
     } catch (error) {
       console.error("Invitation error:", error);
       groveToast.error("Failed to send invitation. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -173,11 +190,6 @@ export default function InviteForm({
                     placeholder='friend@example.com'
                     required={activeTab === "email"}
                   />
-                  <p className='text-xs text-gray-400 mt-1'>
-                    {serviceStatus.email
-                      ? "✅ Email service ready"
-                      : "⚠️ Email service not configured"}
-                  </p>
                 </div>
               </TabsContent>
 
@@ -282,19 +294,19 @@ export default function InviteForm({
                 variant='outline'
                 onClick={onClose}
                 className='flex-1 border-white/20 text-white hover:bg-white/10'
-                disabled={isLoading}
+                disabled={isLoading || isSubmitting}
               >
                 Cancel
               </Button>
               <Button
                 type='submit'
-                disabled={isLoading || (!email && !telegram && !whatsapp)}
+                disabled={isLoading || isSubmitting || (!email && !telegram && !whatsapp)}
                 className='flex-1 bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700'
               >
-                {isLoading ? (
+                {(isLoading || isSubmitting) ? (
                   <>
                     <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2'></div>
-                    Sending...
+                    {isSubmitting ? "Preparing..." : "Sending..."}
                   </>
                 ) : (
                   <>

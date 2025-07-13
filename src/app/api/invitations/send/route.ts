@@ -70,9 +70,15 @@ export async function POST(request: NextRequest) {
     console.log("🌳 Circle:", circleName);
     console.log("👤 Inviter:", inviterName);
 
+    // Build the base URL with fallback
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                   (request.headers.get('host') ? `${request.headers.get('x-forwarded-proto') || 'http'}://${request.headers.get('host')}` : 'http://localhost:3000');
+    
+    console.log("🔗 Using base URL:", baseUrl);
+
     // Send invitation across all channels using the new notification system
     const results = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/send`,
+      `${baseUrl}/api/notifications/send`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

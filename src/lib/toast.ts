@@ -12,19 +12,31 @@ const defaultOptions: ToastOptions = {
 
 export const groveToast = {
   success: (message: string, options?: ToastOptions) => {
-    toast.success(message, { ...defaultOptions, ...options });
+    return toast.success(message, { ...defaultOptions, ...options });
   },
 
   error: (message: string, options?: ToastOptions) => {
-    toast.error(message, { ...defaultOptions, ...options });
+    return toast.error(message, { ...defaultOptions, ...options });
   },
 
   info: (message: string, options?: ToastOptions) => {
-    toast.info(message, { ...defaultOptions, ...options });
+    return toast.info(message, { ...defaultOptions, ...options });
   },
 
   warning: (message: string, options?: ToastOptions) => {
-    toast.warning(message, { ...defaultOptions, ...options });
+    return toast.warning(message, { ...defaultOptions, ...options });
+  },
+
+  loading: (message: string, options?: ToastOptions) => {
+    return toast.loading(message, { ...defaultOptions, ...options });
+  },
+
+  update: (toastId: any, options: any) => {
+    return toast.update(toastId, options);
+  },
+
+  dismiss: (toastId?: any) => {
+    return toast.dismiss(toastId);
   },
 
   // Specific notifications for Grove features
