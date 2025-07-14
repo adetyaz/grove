@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resend, createCircleInviteEmail } from "@/lib/resend";
 import { prisma } from "@/lib/db";
-import {
-  groveContract,
-  formatBTCAmount,
-  formatDeadline,
-} from "@/lib/grove-contract";
+import { groveContract } from "@/lib/grove-contract";
 import { getDynamicUser } from "@/lib/dynamic";
 
 // Type for invitation with circle data
 interface InvitationWithCircle {
   id: string;
-  circleId: number;
+  circleId: string;
   inviterEmail: string;
   inviteeEmail: string | null;
   inviteeWalletAddress: string | null;
@@ -23,7 +18,7 @@ interface InvitationWithCircle {
   acceptedByEmail: string | null;
   acceptedByWalletAddress: string | null;
   circle: {
-    id: number;
+    id: string;
     name: string;
     description: string | null;
     targetAmount: string;
@@ -66,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     // Check if inviter is the circle owner or member
     const isOwner =
-      circle.owner.toLowerCase() === inviter.address?.toLowerCase();
+      circle.owner?.toLowerCase() === inviter.address?.toLowerCase();
     const isMember = await groveContract.isCircleMember(
       Number(circleId),
       inviter.address! as `0x${string}`
@@ -82,7 +77,7 @@ export async function POST(req: NextRequest) {
     // Create invitation record in database
     const invitation = await prisma.circleInvitation.create({
       data: {
-        circleId: Number(circleId),
+        circleId: circleId,
         inviterEmail,
         inviteeEmail: inviteeEmail || null,
         inviteeWalletAddress: inviteeWalletAddress || null,
@@ -92,22 +87,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Send email invitation if email is provided
-    if (inviteeEmail) {
-      const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${invitation.id}`;
-
-      const emailData = {
-        recipientEmail: inviteeEmail,
-        inviterName: inviter.name || inviter.email || "A Grove user",
-        circleName: circle.name,
-        circleDescription: circle.description,
-        targetAmount: formatBTCAmount(circle.targetAmount),
-        deadline: formatDeadline(circle.deadline),
-        inviteLink,
-      };
-
-      await resend.emails.send(createCircleInviteEmail(emailData));
-    }
+    // No longer sending email invitations since SendGrid was removed
 
     return NextResponse.json({
       success: true,
@@ -167,7 +147,9 @@ export async function GET(req: NextRequest) {
     // Enrich with contract data
     const enrichedInvitations = await Promise.all(
       invitations.map(async (invitation: InvitationWithCircle) => {
-        const circleData = await groveContract.getCircle(invitation.circleId);
+        const circleData = await groveContract.getCircle(
+          Number(invitation.circleId)
+        );
         return {
           ...invitation,
           circle: {

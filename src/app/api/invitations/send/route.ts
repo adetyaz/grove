@@ -71,31 +71,32 @@ export async function POST(request: NextRequest) {
     console.log("👤 Inviter:", inviterName);
 
     // Build the base URL with fallback
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                   (request.headers.get('host') ? `${request.headers.get('x-forwarded-proto') || 'http'}://${request.headers.get('host')}` : 'http://localhost:3000');
-    
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      (request.headers.get("host")
+        ? `${request.headers.get("x-forwarded-proto") || "http"}://${request.headers.get("host")}`
+        : "http://localhost:3000");
+
     console.log("🔗 Using base URL:", baseUrl);
 
     // Send invitation across all channels using the new notification system
-    const results = await fetch(
-      `${baseUrl}/api/notifications/send`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          event: "send_invitation",
-          circleId: circleId, // This should be the UUID from the request
-          data: {
-            recipientEmail,
-            recipientTelegram,
-            recipientWhatsApp,
-            inviterName,
-            inviterEmail,
-            inviterAddress,
-          },
-        }),
-      }
-    );
+    const results = await fetch(`${baseUrl}/api/notifications/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event: "send_invitation",
+        circleId: circleId, // This should be the UUID from the request
+        data: {
+          recipientEmail,
+          recipientTelegram,
+          recipientWhatsApp,
+          inviterName,
+          inviterEmail,
+          inviterAddress,
+          inviteLink, // Pass the correct invite link from frontend
+        },
+      }),
+    });
 
     const notificationResponse = await results.json();
 

@@ -6,8 +6,8 @@ import {
   decodeEventLog,
   getEventSelector,
 } from "viem";
-import { CITREA_TESTNET } from "@/contracts/constants";
-import ContractSyncService from "@/lib/contract-sync";
+import { CITREA_TESTNET, GROVE_CONTRACT_ADDRESS } from "@/contracts/constants";
+import { prisma } from "@/lib/db";
 
 // Create a public client for reading blockchain data
 const publicClient = createPublicClient({
@@ -24,25 +24,119 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const databaseCircleId = searchParams.get("databaseCircleId");
 
-    // Get transaction receipt
-    const receipt = await publicClient.getTransactionReceipt({ hash });
+    console.log(`🔍 Fetching transaction receipt for ${hash}...`);
+
+    // Retry logic for getting transaction receipt
+    let receipt;
+    let attempts = 0;
+    const maxAttempts = 5;
+    const baseDelay = 2000; // Start with 2 seconds
+
+    while (attempts < maxAttempts) {
+      try {
+        attempts++;
+        console.log(
+          `📄 Attempt ${attempts}/${maxAttempts} to get receipt for ${hash}`
+        );
+
+        receipt = await publicClient.getTransactionReceipt({ hash });
+        console.log(`✅ Successfully got receipt on attempt ${attempts}`);
+        break;
+      } catch (error: any) {
+        if (error.name === "TransactionReceiptNotFoundError") {
+          if (attempts < maxAttempts) {
+            const delay = baseDelay * Math.pow(1.5, attempts - 1); // Exponential backoff
+            console.log(
+              `⏳ Transaction not mined yet, waiting ${delay}ms before retry ${attempts + 1}/${maxAttempts}`
+            );
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            continue;
+          } else {
+            console.log(
+              `❌ Transaction still not mined after ${maxAttempts} attempts`
+            );
+            return Response.json(
+              {
+                error: "Transaction not yet mined",
+                details: `Transaction ${hash} has not been mined after ${maxAttempts} attempts. Please try again in a few moments.`,
+                retry: true,
+                hash,
+              },
+              { status: 202 } // 202 Accepted - processing but not complete
+            );
+          }
+        } else {
+          // Different error, don't retry
+          throw error;
+        }
+      }
+    }
+
+    if (!receipt) {
+      return Response.json(
+        {
+          error: "Could not get transaction receipt",
+          details:
+            "Failed to retrieve transaction receipt after multiple attempts",
+          hash,
+        },
+        { status: 500 }
+      );
+    }
+
+    console.log(`📄 Transaction receipt for ${hash}:`, {
+      status: receipt.status,
+      blockNumber: receipt.blockNumber.toString(),
+      logsCount: receipt.logs?.length || 0,
+    });
+
+    // Filter logs from Grove contract only
+    const groveLogs =
+      receipt.logs?.filter(
+        (log) =>
+          log.address.toLowerCase() === GROVE_CONTRACT_ADDRESS.toLowerCase()
+      ) || [];
+
+    console.log(`🏠 Grove contract logs:`, {
+      groveContractAddress: GROVE_CONTRACT_ADDRESS,
+      totalLogs: receipt.logs?.length || 0,
+      groveLogsCount: groveLogs.length,
+      allLogAddresses: receipt.logs?.map((log) => log.address) || [],
+    });
 
     // Parse CircleCreated event logs
     let circleId = undefined;
 
-    if (receipt.logs && receipt.logs.length > 0) {
-      // Look for CircleCreated event
+    if (groveLogs.length > 0) {
+      // Look for CircleCreated event - match exact signature from contract
       const circleCreatedEvent = parseAbiItem(
-        "event CircleCreated(uint256 indexed circleId, address indexed owner, string name)"
+        "event CircleCreated(uint circleId, address owner, string name)"
       );
 
       // Get the event selector (topic0) for CircleCreated
       const circleCreatedSelector = getEventSelector(circleCreatedEvent);
 
-      for (const log of receipt.logs) {
+      console.log(`🔍 Event signature info:`, {
+        expectedSelector: circleCreatedSelector,
+        contractSignature:
+          "CircleCreated(uint circleId, address owner, string name)",
+      });
+
+      for (const log of groveLogs) {
+        // Only process Grove contract logs
+        console.log(`🔍 Processing Grove log:`, {
+          address: log.address,
+          topic0: log.topics[0],
+          expectedTopic0: circleCreatedSelector,
+          topicsMatch: log.topics[0] === circleCreatedSelector,
+          topics: log.topics,
+          data: log.data,
+        });
         try {
           // Check if this log matches our CircleCreated event
           if (log.topics[0] === circleCreatedSelector) {
+            console.log(`🎯 Found CircleCreated event in log:`, log);
+
             // Decode the event log
             const decodedLog = decodeEventLog({
               abi: [circleCreatedEvent],
@@ -50,13 +144,17 @@ export async function GET(
               topics: log.topics,
             });
 
+            console.log(`📝 Decoded event:`, decodedLog);
+
             // Extract circle ID from decoded args
             if (decodedLog.eventName === "CircleCreated" && decodedLog.args) {
               circleId = Number(decodedLog.args.circleId);
+              console.log(`✅ Extracted circleId: ${circleId}`);
               break;
             }
           }
-        } catch {
+        } catch (error) {
+          console.log(`❌ Error parsing log:`, error);
           // Continue to next log if parsing fails
           continue;
         }
@@ -68,10 +166,34 @@ export async function GET(
       console.log(
         `🔄 Auto-syncing circle ${databaseCircleId} with onChainId ${circleId}`
       );
-      await ContractSyncService.syncCircleFromTransaction(
-        hash,
-        databaseCircleId
-      );
+
+      try {
+        // Simple direct sync - just update the onChainId in the database
+        const updatedCircle = await prisma.circle.update({
+          where: { id: databaseCircleId },
+          data: {
+            onChainId: Number(circleId),
+            syncStatus: "SYNCED",
+            transactionHash: hash,
+          },
+        });
+
+        console.log(`✅ Successfully synced circle:`, {
+          id: updatedCircle.id,
+          onChainId: updatedCircle.onChainId,
+          syncStatus: updatedCircle.syncStatus,
+        });
+      } catch (syncError) {
+        console.error(`❌ Error syncing circle:`, syncError);
+      }
+    } else {
+      console.log(`⚠️ Sync skipped:`, {
+        databaseCircleId,
+        circleId,
+        reason: !databaseCircleId
+          ? "No databaseCircleId"
+          : "No circleId found in logs",
+      });
     }
 
     return Response.json({
@@ -82,12 +204,27 @@ export async function GET(
       gasUsed: receipt.gasUsed.toString(),
       synced: !!databaseCircleId,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching transaction:", error);
+
+    // Handle specific error types
+    if (error.name === "TransactionReceiptNotFoundError") {
+      return Response.json(
+        {
+          error: "Transaction not yet mined",
+          details: `Transaction ${params.hash} has not been mined yet. Please wait a moment and try again.`,
+          retry: true,
+          hash: params.hash,
+        },
+        { status: 202 } // 202 Accepted - processing but not complete
+      );
+    }
+
     return Response.json(
       {
         error: "Failed to fetch transaction",
         details: error instanceof Error ? error.message : "Unknown error",
+        hash: params.hash,
       },
       { status: 500 }
     );

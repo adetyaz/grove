@@ -41,12 +41,17 @@ interface CircleCardProps {
   };
   userAddress: string;
   onUpdate?: () => void;
+  onContributionSuccess?: (
+    circleId: string,
+    contributionAmount: bigint
+  ) => void; // Add new prop
 }
 
 export default function CircleCard({
   circle,
   userAddress,
   onUpdate,
+  onContributionSuccess,
 }: CircleCardProps) {
   const router = useRouter();
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -279,7 +284,7 @@ export default function CircleCard({
                 setShowInviteModal(true);
               }}
               variant='outline'
-              className='border-blue-500 text-blue-300 hover:bg-blue-500 hover:text-white'
+              className='border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-white'
               disabled={!isCreator}
             >
               <UserPlus className='w-4 h-4 mr-2' />
@@ -331,6 +336,8 @@ export default function CircleCard({
             setShowContributeModal(false);
             onUpdate?.();
           }}
+          onContributionSuccess={onContributionSuccess} // Pass the targeted update function
+          onRefresh={onUpdate} // Pass refresh function as fallback
         />
       )}
     </>

@@ -557,7 +557,8 @@ export default function CircleDetailPage() {
           onClose={() => setShowContributeModal(false)}
           onSuccess={() => {
             setShowContributeModal(false);
-            // Refresh circle data
+            // Instead of full page reload, we could implement a more targeted refresh
+            // For now, keeping the existing behavior
             window.location.reload();
           }}
         />

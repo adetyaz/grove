@@ -10,7 +10,7 @@ import {
   formatBTCAmount,
   formatDeadline,
   calculateProgress,
-} from "@/lib/grove-contract";
+} from "@/hooks/useDashboardData";
 import { GROVE_ABI, GROVE_CONTRACT_ADDRESS } from "@/contracts/constants";
 import { Loader2, CheckCircle, XCircle, Clock, Users } from "lucide-react";
 import { groveToast } from "@/lib/toast";
@@ -404,10 +404,10 @@ export default function InvitePage() {
                           {accepting && !hash
                             ? "Preparing to join..."
                             : isWritePending
-                              ? "Confirm transaction in wallet..."
-                              : isConfirming
-                                ? "Adding you to the circle..."
-                                : "Processing..."}
+                            ? "Confirm transaction in wallet..."
+                            : isConfirming
+                            ? "Adding you to the circle..."
+                            : "Processing..."}
                         </span>
                       </div>
                       {hash && (

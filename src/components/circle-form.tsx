@@ -35,6 +35,8 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
   const [hash, setHash] = useState<string | undefined>(undefined);
   const [isConfirming, setIsConfirming] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [isCreating, setIsCreating] = useState(false); // Add this for initial loading state
 
   const [formData, setFormData] = useState({
     name: "",
@@ -81,6 +83,9 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
       groveToast.error("Please switch to Citrea Testnet to create circles");
       return;
     }
+
+    // Set loading state immediately
+    setIsCreating(true);
 
     try {
       const targetAmountWei = parseEther(formData.targetAmount);
@@ -145,6 +150,9 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
       const interval = BigInt(86400); // 1 day
       const goal = targetAmountWei;
 
+      // Clear the creating state since we're now starting blockchain transaction
+      setIsCreating(false);
+
       // Send transaction using wagmi
       const txHash = await writeContractAsync({
         address: GROVE_CONTRACT_ADDRESS,
@@ -158,23 +166,26 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
 
       groveToast.info("Transaction sent, waiting for confirmation...");
 
-      // Step 3: Wait for confirmation and sync
-      setTimeout(async () => {
-        setIsConfirming(false);
+      // Step 3: Wait for confirmation and sync with retry logic
+      const maxRetries = 6; // Increased from 3 to 6 for better reliability
+      let retryCount = 0;
 
+      const checkTransactionAndSync = async (): Promise<void> => {
         try {
-          // Sync database with blockchain
           const syncResponse = await fetch(
             `/api/transaction/${txHash}?databaseCircleId=${databaseCircleId}`
           );
 
           if (syncResponse.ok) {
             const syncData = await syncResponse.json();
-            if (syncData.synced) {
+            console.log("Sync response:", syncData);
+
+            if (syncData.synced && syncData.circleId) {
               groveToast.success(
                 `Circle "${formData.name}" created successfully!`
               );
               setIsConfirmed(true);
+              setIsNavigating(true);
 
               // Reset form and redirect
               setFormData({
@@ -191,28 +202,69 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
                   onSuccess();
                 }, 1000);
               }
+              return;
+            } else if (retryCount < maxRetries) {
+              // Retry if not synced yet
+              retryCount++;
+              console.log(
+                `Retry ${retryCount}/${maxRetries} - transaction not confirmed yet`
+              );
+              setTimeout(checkTransactionAndSync, 3000); // Retry every 3 seconds
+              return;
             } else {
-              groveToast.warning(
-                "Circle created but sync pending - check status later"
+              throw new Error("Circle created but sync failed after retries");
+            }
+          } else if (syncResponse.status === 202) {
+            // Transaction not yet mined, this is expected
+            const errorData = await syncResponse.json();
+            console.log("Transaction not yet mined:", errorData);
+
+            if (retryCount < maxRetries) {
+              retryCount++;
+              console.log(
+                `Retry ${retryCount}/${maxRetries} - transaction not mined yet, waiting...`
+              );
+              groveToast.info(
+                "Transaction submitted, waiting for confirmation..."
+              );
+              setTimeout(checkTransactionAndSync, 4000); // Wait a bit longer for mining
+              return;
+            } else {
+              throw new Error(
+                "Transaction not confirmed after maximum retries"
               );
             }
           } else {
+            throw new Error(`Sync API returned error: ${syncResponse.status}`);
+          }
+        } catch (error) {
+          console.error("Sync error:", error);
+          if (retryCount < maxRetries) {
+            retryCount++;
+            console.log(
+              `Retry ${retryCount}/${maxRetries} due to error:`,
+              error
+            );
+            setTimeout(checkTransactionAndSync, 3000);
+          } else {
+            setIsConfirming(false);
             groveToast.warning(
-              "Circle created but failed to sync - check status later"
+              "Circle created but sync failed - please refresh the page"
             );
           }
-        } catch (syncError) {
-          console.error("Sync error:", syncError);
-          groveToast.warning(
-            "Circle created but sync failed - check status later"
-          );
         }
-      }, 5000);
+      };
+
+      // Start checking after 2 seconds (give time for transaction to be mined)
+      setTimeout(checkTransactionAndSync, 2000);
     } catch (error) {
       console.error("Circle creation error:", error);
       groveToast.error(
         "Failed to create circle. Please check your wallet and try again."
       );
+      setIsConfirming(false);
+      setIsNavigating(false);
+      setIsCreating(false); // Reset loading state on error
     }
   };
 
@@ -376,6 +428,15 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
           </div>
         )}
 
+        {isNavigating && (
+          <div className='bg-blue-500/20 border border-blue-500/30 rounded-lg p-4'>
+            <p className='text-blue-200 text-sm'>
+              <strong>Success:</strong> Circle created! Redirecting to
+              dashboard...
+            </p>
+          </div>
+        )}
+
         {/* Error Messages */}
         {writeError && (
           <div className='bg-red-500/20 border border-red-500/30 rounded-lg p-4'>
@@ -404,7 +465,9 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
           onClick={createCircle}
           disabled={
             isPending ||
+            isCreating ||
             isConfirming ||
+            isNavigating ||
             !isConnected ||
             !isOnCorrectNetwork ||
             !formData.name ||
@@ -415,15 +478,25 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
           }
           className='w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-4 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-200 transform hover:scale-[1.02] disabled:hover:scale-100 shadow-lg'
         >
-          {isPending ? (
+          {isCreating ? (
             <div className='flex items-center justify-center'>
               <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2'></div>
               Creating Circle...
+            </div>
+          ) : isPending ? (
+            <div className='flex items-center justify-center'>
+              <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2'></div>
+              Creating on Blockchain...
             </div>
           ) : isConfirming ? (
             <div className='flex items-center justify-center'>
               <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2'></div>
               Confirming Transaction...
+            </div>
+          ) : isNavigating ? (
+            <div className='flex items-center justify-center'>
+              <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2'></div>
+              Redirecting to Dashboard...
             </div>
           ) : (
             <div className='flex items-center justify-center'>

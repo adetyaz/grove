@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/db";
 import { NextRequest } from "next/server";
-import ContractSyncService from "@/lib/contract-sync";
 
 // POST endpoint to store circle data BEFORE on-chain creation
 export async function POST(req: NextRequest) {

@@ -169,14 +169,82 @@ export function useDashboardData() {
     }
   }, [address, userCircleIds, fetchCircleDetails]);
 
+  // Memoized function to update a specific circle after contribution
+  const updateCircleContribution = useCallback(
+    (circleId: string, contributionAmount: bigint) => {
+      console.log("💰 updateCircleContribution called with:", {
+        circleId,
+        contributionAmount: contributionAmount.toString(),
+      });
+
+      setDashboardData((prevData) => {
+        console.log("🔍 Current dashboard data before update:", {
+          currentCircles: prevData.circles.map((c) => ({
+            id: c.id,
+            name: c.name,
+            currentAmount: c.currentAmount.toString(),
+          })),
+        });
+
+        const updatedCircles = prevData.circles.map((circle) => {
+          if (circle.id === circleId) {
+            const newCurrentAmount = circle.currentAmount + contributionAmount;
+            console.log(`🔄 Updating circle ${circle.name}:`, {
+              oldAmount: circle.currentAmount.toString(),
+              contributionAmount: contributionAmount.toString(),
+              newAmount: newCurrentAmount.toString(),
+            });
+            return {
+              ...circle,
+              currentAmount: newCurrentAmount,
+            };
+          }
+          return circle;
+        });
+
+        // Recalculate stats with updated data
+        const totalSaved = updatedCircles.reduce(
+          (sum, circle) => sum + circle.currentAmount,
+          BigInt(0)
+        );
+        const goalsReached = updatedCircles.filter(
+          (circle) => circle.currentAmount >= circle.targetAmount
+        ).length;
+
+        const newData = {
+          ...prevData,
+          totalSaved,
+          goalsReached,
+          circles: updatedCircles,
+        };
+
+        console.log("✅ Dashboard data updated:", {
+          oldTotalSaved: prevData.totalSaved.toString(),
+          newTotalSaved: newData.totalSaved.toString(),
+          circleCount: newData.circles.length,
+        });
+
+        return newData;
+      });
+    },
+    [] // No dependencies needed since we use the prevData pattern
+  );
+
   // Memoize the return value to prevent unnecessary re-renders
   const memoizedData = useMemo(
     () => ({
       dashboardData,
       loading: loadingIds || loading,
       refresh: fetchCircleDetails,
+      updateCircleContribution, // Add the new function
     }),
-    [dashboardData, loadingIds, loading, fetchCircleDetails]
+    [
+      dashboardData,
+      loadingIds,
+      loading,
+      fetchCircleDetails,
+      updateCircleContribution,
+    ]
   );
 
   return memoizedData;

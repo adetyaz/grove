@@ -27,7 +27,8 @@ export default function DashboardPage() {
   const [copied, setCopied] = useState(false);
   const [waitingForAutoConnect, setWaitingForAutoConnect] = useState(true);
   const autoConnectTimeout = useRef<NodeJS.Timeout | null>(null);
-  const { dashboardData, loading } = useDashboardData();
+  const { dashboardData, loading, updateCircleContribution } =
+    useDashboardData();
 
   // Memoize connection state
   const connectionState = useMemo(
@@ -266,6 +267,7 @@ export default function DashboardPage() {
                       key={circle.id}
                       circle={circle}
                       userAddress={connectionState.address!}
+                      onContributionSuccess={updateCircleContribution}
                     />
                   ))}
                 </div>
@@ -292,7 +294,7 @@ export default function DashboardPage() {
                 </Link>
                 <Button
                   variant='outline'
-                  className='w-full border-green-500 text-green-300 hover:bg-green-500 hover:text-white'
+                  className='w-full border-green-500 text-green-500 hover:bg-green-500 hover:text-white'
                   onClick={() => alert("Contribution feature coming soon!")}
                 >
                   <Wallet className='w-4 h-4 mr-2' />

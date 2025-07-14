@@ -79,7 +79,7 @@ export default function InviteForm({
     }
 
     setIsSubmitting(true);
-    
+
     try {
       // Show initial loading toast
       const loadingToastId = groveToast.loading("Preparing invitation...");
@@ -94,9 +94,9 @@ export default function InviteForm({
       };
 
       // Update loading message
-      groveToast.update(loadingToastId, { 
-        render: "Sending invitation...", 
-        type: "loading" 
+      groveToast.update(loadingToastId, {
+        render: "Sending invitation...",
+        type: "loading",
       });
 
       await sendInvitation(
@@ -293,17 +293,21 @@ export default function InviteForm({
                 type='button'
                 variant='outline'
                 onClick={onClose}
-                className='flex-1 border-white/20 text-white hover:bg-white/10'
+                className='flex-1 border-white/20 text-black hover:bg-white/10'
                 disabled={isLoading || isSubmitting}
               >
                 Cancel
               </Button>
               <Button
                 type='submit'
-                disabled={isLoading || isSubmitting || (!email && !telegram && !whatsapp)}
+                disabled={
+                  isLoading ||
+                  isSubmitting ||
+                  (!email && !telegram && !whatsapp)
+                }
                 className='flex-1 bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700'
               >
-                {(isLoading || isSubmitting) ? (
+                {isLoading || isSubmitting ? (
                   <>
                     <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2'></div>
                     {isSubmitting ? "Preparing..." : "Sending..."}

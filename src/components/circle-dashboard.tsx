@@ -16,10 +16,15 @@ export default function CircleDashboard({
   dashboardData,
   loading,
   refresh,
+  updateCircleContribution,
 }: {
   dashboardData: any;
   loading: boolean;
   refresh: () => void;
+  updateCircleContribution?: (
+    circleId: string,
+    contributionAmount: bigint
+  ) => void;
 }) {
   const [contributeModal, setContributeModal] = useState<{
     isOpen: boolean;
@@ -273,8 +278,6 @@ export default function CircleDashboard({
           onChainId={contributeModal.onChainId}
           circleName={contributeModal.circleName}
           onSuccess={() => {
-            // Refresh dashboard data after successful contribution
-            refresh();
             setTimeout(() => {
               setContributeModal({
                 isOpen: false,
@@ -284,6 +287,7 @@ export default function CircleDashboard({
               });
             }, 1500);
           }}
+          onContributionSuccess={updateCircleContribution} // Use targeted update instead of full refresh
           onClose={() =>
             setContributeModal({
               isOpen: false,

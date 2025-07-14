@@ -9,7 +9,8 @@ import { useDashboardData } from "@/hooks/useDashboardData";
 import { groveToast } from "@/lib/toast";
 
 export default function ConnectedUserSection() {
-  const { dashboardData, loading, refresh } = useDashboardData();
+  const { dashboardData, loading, refresh, updateCircleContribution } =
+    useDashboardData();
   const { user, primaryWallet } = useDynamicConnection();
   const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -85,6 +86,7 @@ export default function ConnectedUserSection() {
           dashboardData={dashboardData}
           loading={loading}
           refresh={refresh}
+          updateCircleContribution={updateCircleContribution}
         />
 
         {/* Leaderboard Section */}

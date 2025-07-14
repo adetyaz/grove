@@ -180,6 +180,7 @@ export async function POST(request: NextRequest) {
           recipientTelegram: invitationData.recipientTelegram,
           recipientWhatsApp: invitationData.recipientWhatsApp,
           circleDescription: circle.description || undefined,
+          inviteLink: invitationData.inviteLink, // Pass the correct invite link from frontend
         });
         break;
 

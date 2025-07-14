@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resend, createWelcomeEmail } from "@/lib/resend";
 import { prisma } from "@/lib/db";
 import { groveContract } from "@/lib/grove-contract";
 import { getDynamicUser } from "@/lib/dynamic";
@@ -56,7 +55,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get circle details to verify it exists and is active
-    const circle = await groveContract.getCircle(invitation.circleId);
+    const circle = await groveContract.getCircle(Number(invitation.circleId));
     if (!circle || !circle.isActive) {
       return NextResponse.json(
         { error: "Circle not found or inactive" },
@@ -66,7 +65,7 @@ export async function POST(req: NextRequest) {
 
     // Check if user is already a member
     const isAlreadyMember = await groveContract.isCircleMember(
-      invitation.circleId,
+      Number(invitation.circleId),
       walletAddress as `0x${string}`
     );
 
@@ -118,20 +117,6 @@ export async function POST(req: NextRequest) {
         acceptedByWalletAddress: walletAddress,
       },
     });
-
-    // Send welcome email
-    try {
-      const welcomeEmailData = {
-        recipientEmail: userEmail,
-        recipientName: user.name || undefined,
-        circleName: circle.name,
-      };
-
-      await resend.emails.send(createWelcomeEmail(welcomeEmailData));
-    } catch (emailError) {
-      console.error("Failed to send welcome email:", emailError);
-      // Don't fail the entire operation if email fails
-    }
 
     return NextResponse.json({
       success: true,
@@ -199,7 +184,7 @@ export async function GET(req: NextRequest) {
     // Get additional circle data from contract
     let circleData = null;
     if (isValid) {
-      circleData = await groveContract.getCircle(invitation.circleId);
+      circleData = await groveContract.getCircle(Number(invitation.circleId));
     }
 
     return NextResponse.json({

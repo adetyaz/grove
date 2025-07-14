@@ -509,8 +509,12 @@ export const circleNotifications = {
     recipientTelegram?: string;
     recipientWhatsApp?: string;
     circleDescription?: string;
+    inviteLink?: string; // Accept invite link from frontend
   }) => {
-    const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/circles/${invitation.circleId}/join`;
+    // Use provided invite link or fallback to generated one
+    const inviteLink =
+      invitation.inviteLink ||
+      `${process.env.NEXT_PUBLIC_APP_URL}/circles/${invitation.circleId}/join`;
 
     return await notificationService.sendInvitation({
       recipientEmail: invitation.recipientEmail,

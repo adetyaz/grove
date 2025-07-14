@@ -45,41 +45,16 @@ export function useInvitations() {
         throw new Error(result.error || "Failed to send invitation");
       }
 
-      // Only show toasts for channels the user actually filled
-      const attemptedChannels: string[] = [];
-      if (invitationData.recipientEmail) attemptedChannels.push("Email");
-      if (invitationData.recipientTelegram) attemptedChannels.push("Telegram");
-      if (invitationData.recipientWhatsApp) attemptedChannels.push("WhatsApp");
-
-      const successChannels: string[] = [];
-      if (result.channels.email && invitationData.recipientEmail)
-        successChannels.push("Email");
-      if (result.channels.telegram && invitationData.recipientTelegram)
-        successChannels.push("Telegram");
-      if (result.channels.whatsapp && invitationData.recipientWhatsApp)
-        successChannels.push("WhatsApp");
-
-      if (successChannels.length > 0) {
-        groveToast.success(
-          `Invitation sent successfully via ${successChannels.join(", ")}! 📧`,
-          { autoClose: 5000 }
-        );
-      }
-
-      // Show warning only for attempted channels that failed
-      const failedChannels = attemptedChannels.filter(
-        (channel) => !successChannels.includes(channel)
-      );
-      if (failedChannels.length > 0) {
-        groveToast.warning(
-          `Note: ${failedChannels.join(", ")} delivery failed.`,
-          { autoClose: 8000 }
-        );
+      // Handle successful invitation
+      if (result.success) {
+        groveToast.success(`Invitation sent successfully! 📧`, {
+          autoClose: 5000,
+        });
       }
 
       return {
         success: true,
-        channels: result.channels,
+        results: result.results,
         inviteLink,
       };
     } catch (error) {
