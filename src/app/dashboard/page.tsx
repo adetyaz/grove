@@ -30,7 +30,6 @@ export default function DashboardPage() {
   const { dashboardData, loading, updateCircleContribution } =
     useDashboardData();
 
-  // Memoize connection state
   const connectionState = useMemo(
     () => ({
       isConnected: !!(user && primaryWallet?.address),
@@ -41,7 +40,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setMounted(true);
-    // Wait for auto-connect (2.5s), then allow redirect if still not connected
+
     autoConnectTimeout.current = setTimeout(() => {
       setWaitingForAutoConnect(false);
     }, 2500);
@@ -65,9 +64,7 @@ export default function DashboardPage() {
     }
   }, [connectionState.address]);
 
-  // Prevent hydration mismatch
   if (!mounted || (waitingForAutoConnect && !connectionState.isConnected)) {
-    // Show a loading spinner while waiting for auto-connect
     return (
       <div className='flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900'>
         <div className='animate-spin rounded-full h-12 w-12 border-b-4 border-green-500 mb-6'></div>

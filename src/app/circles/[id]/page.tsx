@@ -27,8 +27,8 @@ import {
 } from "lucide-react";
 
 interface CircleData {
-  id: string; // UUID from database
-  onChainId: number; // Contract ID for blockchain calls
+  id: string;
+  onChainId: number;
   name: string;
   description?: string;
   targetAmount: bigint;
@@ -81,7 +81,7 @@ export default function CircleDetailPage() {
         setLoading(true);
         const response = await fetch(`/api/circles/${circleId}`);
         const data = await response.json();
-        // Accept both { ...circle fields ... } and { circle: { ... } }
+
         if (
           response.ok &&
           data &&
@@ -133,7 +133,7 @@ export default function CircleDetailPage() {
   const formatDeadline = (deadline: bigint | string) => {
     let ts =
       typeof deadline === "string" ? parseInt(deadline) : Number(deadline);
-    if (ts > 1e12) ts = Math.floor(ts / 1000); // convert ms to s if needed
+    if (ts > 1e12) ts = Math.floor(ts / 1000);
     const date = new Date(ts * 1000);
     return date.toLocaleDateString(undefined, {
       year: "numeric",
@@ -239,7 +239,11 @@ export default function CircleDetailPage() {
                       </span>
                     )}
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${circle.isActive ? "bg-green-500/20 text-green-300 border-green-500/30" : "bg-gray-500/20 text-gray-400 border-gray-500/30"}`}
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                        circle.isActive
+                          ? "bg-green-500/20 text-green-300 border-green-500/30"
+                          : "bg-gray-500/20 text-gray-400 border-gray-500/30"
+                      }`}
                     >
                       {circle.isActive ? "Active" : "Inactive"}
                     </span>
@@ -427,7 +431,10 @@ export default function CircleDetailPage() {
                         <span className='text-white font-mono text-sm'>
                           {circle.creator === address
                             ? "You"
-                            : `${circle.creator.slice(0, 6)}...${circle.creator.slice(-4)}`}
+                            : `${circle.creator.slice(
+                                0,
+                                6
+                              )}...${circle.creator.slice(-4)}`}
                         </span>
                       </div>
                     </div>
@@ -543,7 +550,7 @@ export default function CircleDetailPage() {
           onClose={() => setShowInviteModal(false)}
           onSuccess={() => {
             setShowInviteModal(false);
-            // Refresh circle data
+
             window.location.reload();
           }}
         />
@@ -557,8 +564,6 @@ export default function CircleDetailPage() {
           onClose={() => setShowContributeModal(false)}
           onSuccess={() => {
             setShowContributeModal(false);
-            // Instead of full page reload, we could implement a more targeted refresh
-            // For now, keeping the existing behavior
             window.location.reload();
           }}
         />

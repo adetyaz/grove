@@ -6,13 +6,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     const {
-      circleId, // UUID of the circle
+      circleId,
       recipientEmail,
       recipientTelegram,
       recipientWhatsApp,
       inviterName,
       inviterAddress,
-      inviterEmail, // Get sender email from frontend
+      inviterEmail,
       circleName,
       inviteLink,
     } = body;
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate wallet address format (basic ETH address check)
+    // Validate wallet address
     const addressRegex = /^0x[a-fA-F0-9]{40}$/;
     if (!addressRegex.test(inviterAddress)) {
       return NextResponse.json(
@@ -65,19 +65,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("📧 Sending invitation to:", recipientEmail);
-    console.log("📨 From:", inviterEmail);
-    console.log("🌳 Circle:", circleName);
-    console.log("👤 Inviter:", inviterName);
-
-    // Build the base URL with fallback
     const baseUrl =
       process.env.NEXT_PUBLIC_APP_URL ||
       (request.headers.get("host")
-        ? `${request.headers.get("x-forwarded-proto") || "http"}://${request.headers.get("host")}`
+        ? `${
+            request.headers.get("x-forwarded-proto") || "http"
+          }://${request.headers.get("host")}`
         : "http://localhost:3000");
-
-    console.log("🔗 Using base URL:", baseUrl);
 
     // Send invitation across all channels using the new notification system
     const results = await fetch(`${baseUrl}/api/notifications/send`, {
@@ -85,7 +79,7 @@ export async function POST(request: NextRequest) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         event: "send_invitation",
-        circleId: circleId, // This should be the UUID from the request
+        circleId: circleId,
         data: {
           recipientEmail,
           recipientTelegram,
@@ -93,14 +87,12 @@ export async function POST(request: NextRequest) {
           inviterName,
           inviterEmail,
           inviterAddress,
-          inviteLink, // Pass the correct invite link from frontend
+          inviteLink,
         },
       }),
     });
 
     const notificationResponse = await results.json();
-
-    console.log("📨 Invitation results:", notificationResponse);
 
     // Check if the notification was successful
     const hasSuccess = notificationResponse.success;

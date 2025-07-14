@@ -206,7 +206,9 @@ export default function CircleDashboard({
                   </div>
                   <div className='text-right'>
                     <span
-                      className={`text-sm ${isExpired ? "text-red-400" : "text-gray-400"}`}
+                      className={`text-sm ${
+                        isExpired ? "text-red-400" : "text-gray-400"
+                      }`}
                     >
                       {formatDeadline(circle.deadline)}
                     </span>
@@ -258,7 +260,7 @@ export default function CircleDashboard({
                         isOpen: true,
                         circleId: circle.id,
                         maxAmount: circle.currentAmount,
-                        receiver: "", // TODO: set to beneficiary address
+                        receiver: "",
                       });
                     }}
                   >
@@ -287,7 +289,7 @@ export default function CircleDashboard({
               });
             }, 1500);
           }}
-          onContributionSuccess={updateCircleContribution} // Use targeted update instead of full refresh
+          onContributionSuccess={updateCircleContribution}
           onClose={() =>
             setContributeModal({
               isOpen: false,
@@ -353,7 +355,6 @@ export default function CircleDashboard({
           circleName={inviteModal.circleName}
           circleDescription={`Join our Bitcoin savings circle "${inviteModal.circleName}" and start building wealth together!`}
           onSuccess={() => {
-            // Optionally refresh member count or show success message
             console.log("Invitation sent successfully!");
           }}
           onClose={() =>

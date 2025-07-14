@@ -24,30 +24,26 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const databaseCircleId = searchParams.get("databaseCircleId");
 
-    console.log(`🔍 Fetching transaction receipt for ${hash}...`);
-
-    // Retry logic for getting transaction receipt
     let receipt;
     let attempts = 0;
     const maxAttempts = 5;
-    const baseDelay = 2000; // Start with 2 seconds
+    const baseDelay = 2000;
 
     while (attempts < maxAttempts) {
       try {
         attempts++;
-        console.log(
-          `📄 Attempt ${attempts}/${maxAttempts} to get receipt for ${hash}`
-        );
 
         receipt = await publicClient.getTransactionReceipt({ hash });
-        console.log(`✅ Successfully got receipt on attempt ${attempts}`);
+
         break;
       } catch (error: any) {
         if (error.name === "TransactionReceiptNotFoundError") {
           if (attempts < maxAttempts) {
             const delay = baseDelay * Math.pow(1.5, attempts - 1); // Exponential backoff
             console.log(
-              `⏳ Transaction not mined yet, waiting ${delay}ms before retry ${attempts + 1}/${maxAttempts}`
+              `⏳ Transaction not mined yet, waiting ${delay}ms before retry ${
+                attempts + 1
+              }/${maxAttempts}`
             );
             await new Promise((resolve) => setTimeout(resolve, delay));
             continue;
@@ -62,11 +58,10 @@ export async function GET(
                 retry: true,
                 hash,
               },
-              { status: 202 } // 202 Accepted - processing but not complete
+              { status: 202 }
             );
           }
         } else {
-          // Different error, don't retry
           throw error;
         }
       }

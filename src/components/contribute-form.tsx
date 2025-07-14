@@ -9,16 +9,16 @@ import { useWriteContract, useReadContract } from "wagmi";
 import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/contracts/constants";
 
 interface ContributeFormProps {
-  circleId: string; // UUID
-  onChainId: number; // Contract ID
+  circleId: string;
+  onChainId: number;
   circleName: string;
   onSuccess?: () => void;
   onClose?: () => void;
   onContributionSuccess?: (
     circleId: string,
     contributionAmount: bigint
-  ) => void; // New prop for targeted updates
-  onRefresh?: () => void; // Fallback refresh function
+  ) => void;
+  onRefresh?: () => void;
 }
 
 export default function ContributeForm({
@@ -50,9 +50,9 @@ export default function ContributeForm({
     args: onChainId && address ? [BigInt(onChainId), address] : undefined,
     query: {
       enabled: !!(address && onChainId && onChainId > 0),
-      staleTime: 0, // Don't cache membership checks
-      refetchOnWindowFocus: true, // Refetch when window gains focus
-      refetchInterval: 5000, // Refetch every 5 seconds to catch membership changes
+      staleTime: 0,
+      refetchOnWindowFocus: true,
+      refetchInterval: 5000,
     },
   });
 

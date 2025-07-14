@@ -7,7 +7,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const circleId = params.id; // Now expects UUID, not numeric ID
+    const circleId = params.id;
 
     // Validate UUID format (basic check)
     const uuidRegex =
@@ -56,8 +56,8 @@ export async function GET(
 
     // Return circle data with UUID as ID
     const circleData = {
-      id: circle.id, // Use UUID as primary ID
-      onChainId: circle.onChainId, // Include contract ID if synced
+      id: circle.id,
+      onChainId: circle.onChainId,
       name: circle.name,
       description: circle.description,
       targetAmount: circle.targetAmount,
@@ -65,7 +65,7 @@ export async function GET(
       deadline: Math.floor(new Date(circle.deadline).getTime() / 1000),
       isActive: circle.syncStatus === "SYNCED",
       syncStatus: circle.syncStatus,
-      memberCount: circle.members.length + 1, // +1 for owner
+      memberCount: circle.members.length + 1,
       members: [
         circle.owner.wallet,
         ...circle.members.map((m: { wallet: string }) => m.wallet),

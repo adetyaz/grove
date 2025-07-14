@@ -5,7 +5,7 @@ import CircleDashboard from "./circle-dashboard";
 import Leaderboard from "./leaderboard";
 import ContributionHistory from "./contribution-history";
 import { useDashboardData } from "@/hooks/useDashboardData";
-// import EmailTestComponent from "./email-test";
+
 import { groveToast } from "@/lib/toast";
 
 export default function ConnectedUserSection() {
@@ -32,13 +32,12 @@ export default function ConnectedUserSection() {
     }
   };
 
-  // Prevent hydration mismatch by not rendering until mounted
   if (!mounted) {
     return null;
   }
 
   if (!isConnected) {
-    return null; // Don't show anything when wallet is not connected
+    return null;
   }
   return (
     <section className='bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 py-20'>
@@ -112,8 +111,8 @@ export default function ConnectedUserSection() {
                 id: `${circle.id}-latest`,
                 contributor: circle.creator,
                 amount: circle.currentAmount.toString(),
-                timestamp: new Date().toISOString(), // TODO: Use real timestamp
-                txHash: undefined, // TODO: Use real txHash
+                timestamp: new Date().toISOString(),
+                txHash: undefined,
               },
             ])}
           />

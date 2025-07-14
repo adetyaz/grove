@@ -18,7 +18,7 @@ import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { groveToast } from "@/lib/toast";
 
 interface InviteFormProps {
-  circleId: string; // Changed to string for UUID
+  circleId: string;
   circleName: string;
   circleDescription?: string;
   onSuccess?: () => void;

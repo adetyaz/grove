@@ -34,7 +34,6 @@ export default function WalletButton({
 
   const [copied, setCopied] = useState(false);
 
-  // Memoize connection state to prevent unnecessary re-renders
   const connectionState = useMemo(
     () => ({
       isConnected: !!(user && primaryWallet?.address),

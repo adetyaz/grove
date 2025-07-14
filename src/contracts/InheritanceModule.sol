@@ -12,7 +12,7 @@ pragma solidity ^0.8.20;
 contract InheritanceModule {
     struct Beneficiary {
         address beneficiary;
-        uint256 share; // percentage (out of 10000)
+        uint256 share;
     }
 
     // circleId => owner => beneficiaries

@@ -1,12 +1,11 @@
 import nodemailer from "nodemailer";
 
-// Create email transporter using static Gmail config (matches working Nerowork setup)
 export const createEmailTransporter = () => {
   const emailConfig = {
     service: "gmail",
     auth: {
-      user: process.env.SMTP_USER, // Gmail address (must match app password)
-      pass: process.env.GMAIL_APP_PASSWORD, // Gmail app password
+      user: process.env.SMTP_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
     },
     connectionTimeout: 60000,
     greetingTimeout: 30000,
@@ -91,19 +90,32 @@ export const emailTemplates = {
             <div class="content">
               <div class="invitation-box">
                 <h2 style="margin-top: 0; color: #1f2937;">You've been invited!</h2>
-                <p><strong>${data.inviterName}</strong> has invited you to join their Bitcoin savings circle on Grove.</p>
-                <p style="font-size: 14px; color: #6b7280;">Inviter wallet: <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${data.inviterAddress.slice(0, 6)}...${data.inviterAddress.slice(-4)}</code></p>
+                <p><strong>${
+                  data.inviterName
+                }</strong> has invited you to join their Bitcoin savings circle on Grove.</p>
+                <p style="font-size: 14px; color: #6b7280;">Inviter wallet: <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${data.inviterAddress.slice(
+                  0,
+                  6
+                )}...${data.inviterAddress.slice(-4)}</code></p>
               </div>
 
               <div class="circle-info">
                 <h3 style="margin-top: 0; color: #ea580c;">📊 Circle Details</h3>
-                <p><strong>Circle Name:</strong> <span class="highlight">${data.circleName}</span></p>
-                ${data.circleDescription ? `<p><strong>Description:</strong> ${data.circleDescription}</p>` : ""}
+                <p><strong>Circle Name:</strong> <span class="highlight">${
+                  data.circleName
+                }</span></p>
+                ${
+                  data.circleDescription
+                    ? `<p><strong>Description:</strong> ${data.circleDescription}</p>`
+                    : ""
+                }
                 <p><strong>Platform:</strong> Grove (Bitcoin Layer 2 - Citrea Testnet)</p>
               </div>
 
               <div style="text-align: center; margin: 40px 0;">
-                <a href="${data.inviteLink}" class="cta-button">Join Circle 🚀</a>
+                <a href="${
+                  data.inviteLink
+                }" class="cta-button">Join Circle 🚀</a>
               </div>
 
               <div class="divider"></div>

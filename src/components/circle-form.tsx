@@ -22,7 +22,6 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
   const address = primaryWallet?.address;
   const isConnected = !!(user && primaryWallet?.address);
 
-  // Wagmi hook for contract writes
   const {
     writeContractAsync,
     isPending,
@@ -36,7 +35,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
   const [isConfirming, setIsConfirming] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
-  const [isCreating, setIsCreating] = useState(false); // Add this for initial loading state
+  const [isCreating, setIsCreating] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -115,7 +114,6 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
       setIsConfirming(false);
       setIsConfirmed(false);
 
-      // Step 1: Create circle in database FIRST to get UUID
       groveToast.info("Creating circle in database...");
 
       const dbResponse = await fetch("/api/circles", {
@@ -131,7 +129,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
           fixedAmount: fixedAmountWei.toString(),
           deadline: deadlineTimestamp.toString(),
           ownerWallet: address,
-          ownerEmail: user?.email || `${address}@grove.temp`, // Use Dynamic email or fallback
+          ownerEmail: user?.email || `${address}@grove.temp`,
         }),
       });
 
@@ -204,18 +202,14 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
               }
               return;
             } else if (retryCount < maxRetries) {
-              // Retry if not synced yet
               retryCount++;
-              console.log(
-                `Retry ${retryCount}/${maxRetries} - transaction not confirmed yet`
-              );
-              setTimeout(checkTransactionAndSync, 3000); // Retry every 3 seconds
+
+              setTimeout(checkTransactionAndSync, 3000);
               return;
             } else {
               throw new Error("Circle created but sync failed after retries");
             }
           } else if (syncResponse.status === 202) {
-            // Transaction not yet mined, this is expected
             const errorData = await syncResponse.json();
             console.log("Transaction not yet mined:", errorData);
 
@@ -227,7 +221,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
               groveToast.info(
                 "Transaction submitted, waiting for confirmation..."
               );
-              setTimeout(checkTransactionAndSync, 4000); // Wait a bit longer for mining
+              setTimeout(checkTransactionAndSync, 4000);
               return;
             } else {
               throw new Error(
@@ -255,7 +249,6 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
         }
       };
 
-      // Start checking after 2 seconds (give time for transaction to be mined)
       setTimeout(checkTransactionAndSync, 2000);
     } catch (error) {
       console.error("Circle creation error:", error);
@@ -264,7 +257,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
       );
       setIsConfirming(false);
       setIsNavigating(false);
-      setIsCreating(false); // Reset loading state on error
+      setIsCreating(false);
     }
   };
 

@@ -27,8 +27,8 @@ import { groveToast } from "@/lib/toast";
 
 interface CircleCardProps {
   circle: {
-    id: string; // Changed to string for UUID
-    onChainId: number; // Contract ID for blockchain calls
+    id: string;
+    onChainId: number;
     name: string;
     description?: string;
     targetAmount: bigint;
@@ -44,7 +44,7 @@ interface CircleCardProps {
   onContributionSuccess?: (
     circleId: string,
     contributionAmount: bigint
-  ) => void; // Add new prop
+  ) => void;
 }
 
 export default function CircleCard({
@@ -83,9 +83,8 @@ export default function CircleCard({
       groveToast.transactionPending(txHash);
       groveToast.success("Successfully joined the circle!");
 
-      // Refresh the data
       if (onUpdate) {
-        setTimeout(onUpdate, 2000); // Wait a bit for the transaction to be mined
+        setTimeout(onUpdate, 2000);
       }
     } catch (error: any) {
       groveToast.error(
@@ -155,7 +154,7 @@ export default function CircleCard({
               size='icon'
               className='text-gray-400 hover:text-white'
               onClick={(e) => {
-                e.stopPropagation(); // Prevent card click when clicking menu
+                e.stopPropagation();
               }}
             >
               <MoreVertical className='w-4 h-4' />
@@ -164,7 +163,6 @@ export default function CircleCard({
         </CardHeader>
 
         <CardContent className='space-y-6'>
-          {/* Click hint */}
           <div className='text-center'>
             <p className='text-xs text-gray-500 group-hover:text-orange-400 transition-colors'>
               💡 Click anywhere to view full circle details
@@ -336,8 +334,8 @@ export default function CircleCard({
             setShowContributeModal(false);
             onUpdate?.();
           }}
-          onContributionSuccess={onContributionSuccess} // Pass the targeted update function
-          onRefresh={onUpdate} // Pass refresh function as fallback
+          onContributionSuccess={onContributionSuccess}
+          onRefresh={onUpdate}
         />
       )}
     </>

@@ -13,7 +13,6 @@ export default function Home() {
   const { user, primaryWallet, isConnecting } = useDynamicConnection();
   const [mounted, setMounted] = useState(false);
 
-  // Memoize connection state to prevent unnecessary re-renders
   const connectionState = useMemo(
     () => ({
       isConnected: !!(user && primaryWallet && primaryWallet.address),
@@ -23,7 +22,6 @@ export default function Home() {
     [user, primaryWallet, isConnecting]
   );
 
-  // Only log in development and when connection state actually changes
   useEffect(() => {
     if (
       process.env.NODE_ENV === "development" &&
@@ -38,7 +36,6 @@ export default function Home() {
     setMounted(true);
   }, []);
 
-  // Prevent hydration mismatch
   if (!mounted) {
     return null;
   }

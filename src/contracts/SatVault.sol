@@ -13,11 +13,11 @@ contract SatVault {
     // Circle treasury structure
     struct Circle {
         address owner;
-        uint256 contributionAmount; // in sats
-        uint256 contributionInterval; // in seconds
-        uint256 nextPaymentDue; // timestamp
-        uint256 treasuryBalance; // in sats
-        uint256 targetGoal; // in sats (0 = no target)
+        uint256 contributionAmount;
+        uint256 contributionInterval; 
+        uint256 nextPaymentDue; 
+        uint256 treasuryBalance; 
+        uint256 targetGoal;
         bool isActive;
     }
 
@@ -205,7 +205,7 @@ contract SatVault {
     }
 
     /**
-     * @dev Update Grove contract address (only current Grove) - DEPRECATED
+     * @dev Update Grove contract address (only current Grove) 
      */
     function updateGrove(address newGrove) external onlyGrove {
         require(newGrove != address(0), "Invalid grove address");

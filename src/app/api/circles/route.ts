@@ -15,18 +15,7 @@ export async function POST(req: NextRequest) {
       ownerEmail,
     } = await req.json();
 
-    console.log("Creating circle in database:", {
-      name,
-      description,
-      targetAmount,
-      paymentType,
-      fixedAmount,
-      deadline,
-      ownerWallet,
-      ownerEmail,
-    });
-
-    // First, ensure the user exists in our database
+    // First, ensure the user exists in database
     let user = await prisma.user.findUnique({
       where: { wallet: ownerWallet },
     });
@@ -36,13 +25,13 @@ export async function POST(req: NextRequest) {
       user = await prisma.user.create({
         data: {
           wallet: ownerWallet,
-          email: ownerEmail || `${ownerWallet}@temp.com`, // Temporary email
-          name: `User ${ownerWallet.slice(0, 6)}`, // Default name
+          email: ownerEmail || `${ownerWallet}@temp.com`,
+          name: `User ${ownerWallet.slice(0, 6)}`,
         },
       });
     }
 
-    // Create circle in database with UUID, but no onChainId yet
+    // Create circle in database
     const circle = await prisma.circle.create({
       data: {
         name,
@@ -52,7 +41,7 @@ export async function POST(req: NextRequest) {
         fixedAmount: fixedAmount ? fixedAmount.toString() : null,
         deadline: new Date(Number(deadline) * 1000),
         ownerId: user.id,
-        syncStatus: "PENDING", // Will be updated after blockchain transaction
+        syncStatus: "PENDING",
       },
       include: {
         owner: {
@@ -64,7 +53,7 @@ export async function POST(req: NextRequest) {
     return Response.json({
       success: true,
       circle,
-      databaseId: circle.id, // Return UUID for frontend to track
+      databaseId: circle.id,
     });
   } catch (error) {
     console.error("Error creating circle in database:", error);
@@ -88,7 +77,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Find the user by wallet or email
-    // Build user OR clause safely (no undefined)
+
     const userOr: any[] = [];
     if (userWallet) userOr.push({ wallet: userWallet });
     if (userEmail) userOr.push({ email: userEmail });

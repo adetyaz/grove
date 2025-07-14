@@ -70,7 +70,6 @@ export async function POST(req: NextRequest) {
     );
 
     if (isAlreadyMember) {
-      // Update invitation status but don't fail
       await prisma.circleInvitation.update({
         where: { id: invitationId },
         data: {
@@ -88,7 +87,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Simulate the addMember contract call to ensure it will work
     const publicClient = getPublicClient();
 
     try {

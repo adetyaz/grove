@@ -75,7 +75,6 @@ export async function POST(request: NextRequest) {
         "⚠️ Failed to send member joined notification:",
         notificationError
       );
-      // Don't fail the join process for notification errors
     }
 
     return NextResponse.json({

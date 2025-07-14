@@ -22,8 +22,7 @@ function JoinPageContent() {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [navigating, setNavigating] = useState(false);
-  const [shouldAutoJoin, setShouldAutoJoin] = useState(false); // Track if we should auto-join after connection
-  // Only call hooks once at top level
+  const [shouldAutoJoin, setShouldAutoJoin] = useState(false);
   const { writeContractAsync } = useWriteContract();
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>(undefined);
   const {
@@ -74,7 +73,6 @@ function JoinPageContent() {
 
   // Join handler: triggers contract tx, then DB update after confirmation
   const handleJoin = useCallback(async () => {
-    // Enhanced connection checks
     if (!isConnected || !primaryWallet) {
       groveToast.error(
         "Wallet not connected. Please connect your wallet first."
@@ -146,9 +144,7 @@ function JoinPageContent() {
       }
 
       // If not a member, proceed with blockchain transaction
-      console.log(
-        "📝 User not a member yet, sending blockchain transaction..."
-      );
+
       groveToast.info(
         "Confirm the transaction in your wallet to join the circle."
       );
@@ -162,7 +158,6 @@ function JoinPageContent() {
         });
         setTxHash(hash as `0x${string}`);
       } catch (contractError: any) {
-        // Enhanced error handling for connection issues
         const errorMessage =
           contractError?.message ||
           contractError?.toString() ||
@@ -179,9 +174,7 @@ function JoinPageContent() {
           errorMessage.includes("member")
         ) {
           // Handle case where blockchain says user is already a member
-          console.log(
-            "🔄 User is already a member on blockchain, syncing to DB..."
-          );
+
           groveToast.info("You're already a member! Syncing to database...");
 
           try {
@@ -237,16 +230,14 @@ function JoinPageContent() {
     router,
   ]);
 
-  // Auto-join effect: when user connects and shouldAutoJoin is true, automatically join
   useEffect(() => {
     if (isConnected && shouldAutoJoin && circle && !joining && !navigating) {
       console.log("🚀 Auto-joining after wallet connection");
-      setShouldAutoJoin(false); // Reset flag
-      handleJoin(); // Automatically trigger join
+      setShouldAutoJoin(false);
+      handleJoin();
     }
   }, [isConnected, shouldAutoJoin, circle, joining, navigating, handleJoin]);
 
-  // Effect: when tx confirmed, update DB
   useEffect(() => {
     const syncDb = async () => {
       if (txSuccess && txHash && user && primaryWallet?.address) {
@@ -310,23 +301,17 @@ function JoinPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [txSuccess, txError]);
 
-  // Always render, but show error UI if no circleId
   const showInvalid = !circleId;
 
-  // Always render, but show loading UI if loading
   const showLoading = loading;
 
-  // Always render, but show not found UI if no circle
   const showNotFound = !loading && !circle && !!circleId;
 
-  // (removed duplicate contract/tx state)
-
-  // Format deadline as a readable date
   const formatDeadline = (deadline: any) => {
     if (!deadline) return "-";
-    // Accepts both string and number (seconds or ms)
+
     let ts = typeof deadline === "string" ? parseInt(deadline) : deadline;
-    if (ts > 1e12) ts = Math.floor(ts / 1000); // convert ms to s if needed
+    if (ts > 1e12) ts = Math.floor(ts / 1000);
     const date = new Date(ts * 1000);
     return date.toLocaleDateString(undefined, {
       year: "numeric",
@@ -438,8 +423,8 @@ function JoinPageContent() {
             {!isConnected ? (
               <Button
                 onClick={() => {
-                  setShouldAutoJoin(true); // Set flag to auto-join after connection
-                  connect(); // Connect wallet
+                  setShouldAutoJoin(true);
+                  connect();
                 }}
                 className='mt-6 w-full bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold hover:opacity-90'
                 disabled={joining || navigating}
@@ -457,14 +442,14 @@ function JoinPageContent() {
                 {navigating
                   ? "Redirecting to Dashboard..."
                   : joining
-                    ? isAlreadyMember
-                      ? "Syncing to Database..."
-                      : "Joining Circle..."
-                    : checkingMembership
-                      ? "Checking Membership..."
-                      : isAlreadyMember
-                        ? "Sync to Database"
-                        : "Join Circle"}
+                  ? isAlreadyMember
+                    ? "Syncing to Database..."
+                    : "Joining Circle..."
+                  : checkingMembership
+                  ? "Checking Membership..."
+                  : isAlreadyMember
+                  ? "Sync to Database"
+                  : "Join Circle"}
               </Button>
             )}
           </>

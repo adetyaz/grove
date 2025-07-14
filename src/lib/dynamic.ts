@@ -31,17 +31,11 @@ export async function getDynamicUser(
   email: string
 ): Promise<DynamicUser | null> {
   try {
-    // Note: This is a placeholder implementation
-    // In a real app, you'd need to implement server-side user lookup
-    // or use Dynamic's server-side APIs if available
-
-    // For now, we'll return a mock user structure
-    // You should replace this with actual Dynamic API calls or database lookups
     const mockUser: DynamicUser = {
       id: `user_${email.replace("@", "_").replace(".", "_")}`,
       email,
       name: email.split("@")[0],
-      address: "0x1234567890123456789012345678901234567890", // This should come from Dynamic
+      address: "0x1234567890123456789012345678901234567890",
       walletAddress: "0x1234567890123456789012345678901234567890",
     };
 
