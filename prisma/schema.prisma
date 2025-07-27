@@ -19,6 +19,16 @@ model User {
   name      String?
   wallet    String   @unique
   createdAt DateTime @default(now())
+  
+  // Phase 2: Streak Tracking
+  currentStreak      Int      @default(0)
+  longestStreak      Int      @default(0)
+  lastActivityDate   DateTime?
+  totalContributions Int      @default(0)
+  totalSaved         String   @default("0") // Stored as string for bigint
+  invitedMembers     Int      @default(0)
+  circlesCompleted   Int      @default(0)
+  
   ownedCircles Circle[] @relation("CircleOwner")
   memberCircles Circle[] @relation("CircleMembers")
 }
@@ -72,4 +82,17 @@ model CircleInvitation {
   @@index([inviteeEmail])
   @@index([inviteeWalletAddress])
   @@index([circleId])
+}
+
+model UserActivity {
+  id          String   @id @default(uuid())
+  userAddress String
+  type        String   // ActivityType enum values
+  description String?
+  metadata    String?  // JSON string for flexible data storage
+  timestamp   DateTime @default(now())
+  
+  @@index([userAddress])
+  @@index([type])
+  @@index([timestamp])
 }

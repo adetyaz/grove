@@ -6,6 +6,74 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Grove Animations */
+  .animate-fade-in {
+    animation: fadeIn 0.6s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.8s ease-out;
+  }
+
+  .animate-bounce-subtle {
+    animation: bounceSubtle 2s infinite;
+  }
+
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+
+  .hover-lift {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bounceSubtle {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 5px hsla(25, 95%, 53%, 0.5);
+  }
+  to {
+    box-shadow: 0 0 20px hsla(25, 95%, 53%, 0.8),
+      0 0 30px hsla(25, 95%, 53%, 0.4);
+  }
 }
 
 @layer base {
@@ -16,51 +84,81 @@
     --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
+
+    /* Grove Primary - Bitcoin Orange */
+    --primary: 25 95% 53%;
     --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
+
+    /* Grove Secondary - Forest Green for growth */
+    --secondary: 142 76% 36%;
+    --secondary-foreground: 0 0% 98%;
+
     --muted: 0 0% 96.1%;
     --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
+
+    /* Grove Accent - Warm Gold for achievements */
+    --accent: 45 93% 47%;
     --accent-foreground: 0 0% 9%;
+
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
+    --ring: 25 95% 53%;
+
+    /* Grove Custom Charts - Bitcoin/Savings themed */
+    --chart-1: 25 95% 53%; /* Bitcoin Orange */
+    --chart-2: 142 76% 36%; /* Growth Green */
+    --chart-3: 45 93% 47%; /* Achievement Gold */
+    --chart-4: 217 91% 60%; /* Trust Blue */
+    --chart-5: 259 83% 57%; /* Premium Purple */
+    --radius: 0.75rem;
+
+    /* Grove Custom Colors */
+    --grove-success: 142 76% 36%;
+    --grove-warning: 45 93% 47%;
+    --grove-info: 217 91% 60%;
   }
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
+    --background: 222 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    /* Grove Primary - Softer Bitcoin Orange for dark */
+    --primary: 25 95% 53%;
+    --primary-foreground: 222 84% 4.9%;
+
+    /* Grove Secondary - Softer Forest Green */
+    --secondary: 142 76% 36%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    /* Grove Accent - Softer Gold */
+    --accent: 45 93% 47%;
+    --accent-foreground: 222 84% 4.9%;
+
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 32.6% 17.5%;
+    --input: 217 32.6% 17.5%;
+    --ring: 25 95% 53%;
+
+    /* Grove Dark Charts */
+    --chart-1: 25 95% 53%;
+    --chart-2: 142 76% 36%;
+    --chart-3: 45 93% 47%;
+    --chart-4: 217 91% 60%;
+    --chart-5: 259 83% 57%;
+
+    /* Grove Dark Custom Colors */
+    --grove-success: 142 76% 36%;
+    --grove-warning: 45 93% 47%;
+    --grove-info: 217 91% 60%;
   }
 }
 
@@ -83,7 +181,7 @@
 }
 
 .Toastify__toast--success {
-  @apply bg-green-50 border-green-200 text-green-800;
+  @apply bg-grove-success/10 border-grove-success/20 text-grove-success;
 }
 
 .Toastify__toast--error {
@@ -91,15 +189,15 @@
 }
 
 .Toastify__toast--info {
-  @apply bg-blue-50 border-blue-200 text-blue-800;
+  @apply bg-grove-info/10 border-grove-info/20 text-grove-info;
 }
 
 .Toastify__toast--warning {
-  @apply bg-yellow-50 border-yellow-200 text-yellow-800;
+  @apply bg-grove-warning/10 border-grove-warning/20 text-grove-warning;
 }
 
 .Toastify__progress-bar--success {
-  @apply bg-green-500;
+  @apply bg-grove-success;
 }
 
 .Toastify__progress-bar--error {
@@ -107,9 +205,9 @@
 }
 
 .Toastify__progress-bar--info {
-  @apply bg-blue-500;
+  @apply bg-grove-info;
 }
 
 .Toastify__progress-bar--warning {
-  @apply bg-yellow-500;
+  @apply bg-grove-warning;
 }

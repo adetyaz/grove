@@ -2,33 +2,22 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trophy, Medal, Award, TrendingUp } from "lucide-react";
 import { formatBTCAmount } from "@/hooks/useDashboardData";
-
-interface LeaderboardEntry {
-  address: string;
-  name?: string;
-  totalContributed: bigint;
-  circlesCount: number;
-  rank: number;
-  isCurrentUser?: boolean;
-}
+import { useLeaderboard, LeaderboardEntry } from "@/hooks/useLeaderboard";
 
 interface LeaderboardProps {
-  entries: LeaderboardEntry[];
   userAddress: string;
 }
 
-export default function Leaderboard({
-  entries,
-  userAddress,
-}: LeaderboardProps) {
+export default function Leaderboard({ userAddress }: LeaderboardProps) {
+  const { leaderboardData, loading, userRank } = useLeaderboard(userAddress);
   const getRankIcon = (rank: number) => {
     switch (rank) {
       case 1:
-        return <Trophy className='w-5 h-5 text-yellow-400' />;
+        return <Trophy className='w-5 h-5 text-accent' />;
       case 2:
         return <Medal className='w-5 h-5 text-gray-300' />;
       case 3:
-        return <Award className='w-5 h-5 text-orange-400' />;
+        return <Award className='w-5 h-5 text-primary' />;
       default:
         return (
           <span className='w-5 h-5 flex items-center justify-center text-sm font-bold text-gray-400'>
@@ -41,42 +30,45 @@ export default function Leaderboard({
   const getRankColor = (rank: number) => {
     switch (rank) {
       case 1:
-        return "from-yellow-500/20 to-yellow-600/20 border-yellow-500/30";
+        return "from-accent/20 to-accent/30 border-accent/40";
       case 2:
         return "from-gray-400/20 to-gray-500/20 border-gray-400/30";
       case 3:
-        return "from-orange-500/20 to-orange-600/20 border-orange-500/30";
+        return "from-primary/20 to-primary/30 border-primary/40";
       default:
-        return "from-gray-700/20 to-gray-800/20 border-gray-600/30";
+        return "from-white/10 to-white/5 border-white/20";
     }
   };
 
-  const displayEntries = entries;
-
   return (
-    <Card className='bg-gray-800 border-gray-700'>
+    <Card className='bg-white/10 backdrop-blur-sm border-white/20 animate-fade-in'>
       <CardHeader>
         <CardTitle className='text-white flex items-center'>
-          <TrendingUp className='w-5 h-5 mr-2 text-orange-400' />
+          <TrendingUp className='w-5 h-5 mr-2 text-accent' />
           Contribution Leaderboard
         </CardTitle>
       </CardHeader>
       <CardContent className='space-y-3'>
-        {displayEntries.length === 0 ? (
+        {loading ? (
           <div className='text-center py-8'>
-            <TrendingUp className='w-12 h-12 text-gray-600 mx-auto mb-4' />
+            <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4'></div>
+            <p className='text-gray-400'>Loading leaderboard...</p>
+          </div>
+        ) : leaderboardData.length === 0 ? (
+          <div className='text-center py-8'>
+            <TrendingUp className='w-12 h-12 text-gray-500 mx-auto mb-4' />
             <p className='text-gray-400 mb-2'>No leaderboard data yet</p>
             <p className='text-sm text-gray-500'>
               Start contributing to circles to see your ranking!
             </p>
           </div>
         ) : (
-          displayEntries.map((entry) => (
+          leaderboardData.map((entry) => (
             <div
               key={entry.address}
-              className={`p-4 rounded-lg border bg-gradient-to-r ${
+              className={`p-4 rounded-lg border bg-gradient-to-r transition-all duration-300 hover-lift ${
                 entry.isCurrentUser || entry.address === userAddress
-                  ? "from-green-500/20 to-green-600/20 border-green-500/40"
+                  ? "from-secondary/20 to-secondary/30 border-secondary/40"
                   : getRankColor(entry.rank)
               }`}
             >
@@ -89,10 +81,13 @@ export default function Leaderboard({
                         {entry.address === userAddress
                           ? "You"
                           : entry.name ||
-                            `${entry.address.slice(0, 6)}...${entry.address.slice(-4)}`}
+                            `${entry.address.slice(
+                              0,
+                              6
+                            )}...${entry.address.slice(-4)}`}
                       </span>
                       {entry.address === userAddress && (
-                        <span className='px-2 py-1 bg-green-500/20 text-green-300 text-xs rounded-full'>
+                        <span className='px-2 py-1 bg-secondary/20 text-secondary text-xs rounded-full'>
                           You
                         </span>
                       )}

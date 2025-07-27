@@ -21,11 +21,16 @@ export async function POST(req: NextRequest) {
     });
 
     if (!user) {
-      // Create user if they don't exist
+      // Create user if they don't exist, always use the actual email from Dynamic
+      if (!ownerEmail) {
+        throw new Error(
+          "Owner email is required and must be provided by Dynamic."
+        );
+      }
       user = await prisma.user.create({
         data: {
           wallet: ownerWallet,
-          email: ownerEmail || `${ownerWallet}@temp.com`,
+          email: ownerEmail,
           name: `User ${ownerWallet.slice(0, 6)}`,
         },
       });

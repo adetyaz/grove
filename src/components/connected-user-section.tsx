@@ -3,7 +3,7 @@ import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { useEffect, useState } from "react";
 import CircleDashboard from "./circle-dashboard";
 import Leaderboard from "./leaderboard";
-import ContributionHistory from "./contribution-history";
+import EnhancedActivityFeed from "./enhanced-activity-feed";
 import { useDashboardData } from "@/hooks/useDashboardData";
 
 import { groveToast } from "@/lib/toast";
@@ -90,32 +90,12 @@ export default function ConnectedUserSection() {
 
         {/* Leaderboard Section */}
         <div className='mt-12'>
-          <Leaderboard
-            entries={dashboardData.circles.map((circle) => ({
-              address: circle.creator,
-              name: circle.name,
-              totalContributed: circle.currentAmount,
-              circlesCount: 1,
-              rank: 1, // TODO: Calculate real rank
-              isCurrentUser: circle.creator === address,
-            }))}
-            userAddress={address || ""}
-          />
+          <Leaderboard userAddress={address || ""} />
         </div>
 
         {/* Recent Activity Section */}
         <div className='mt-12'>
-          <ContributionHistory
-            contributions={dashboardData.circles.flatMap((circle) => [
-              {
-                id: `${circle.id}-latest`,
-                contributor: circle.creator,
-                amount: circle.currentAmount.toString(),
-                timestamp: new Date().toISOString(),
-                txHash: undefined,
-              },
-            ])}
-          />
+          <EnhancedActivityFeed userAddress={address || ""} />
         </div>
       </div>
     </section>

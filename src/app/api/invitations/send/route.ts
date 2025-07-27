@@ -8,8 +8,8 @@ export async function POST(request: NextRequest) {
     const {
       circleId,
       recipientEmail,
-      recipientTelegram,
-      recipientWhatsApp,
+      // recipientTelegram, // Commented out for app focus
+      // recipientWhatsApp, // Commented out for app focus
       inviterName,
       inviterAddress,
       inviterEmail,
@@ -82,8 +82,8 @@ export async function POST(request: NextRequest) {
         circleId: circleId,
         data: {
           recipientEmail,
-          recipientTelegram,
-          recipientWhatsApp,
+          // recipientTelegram, // Commented out for app focus
+          // recipientWhatsApp, // Commented out for app focus
           inviterName,
           inviterEmail,
           inviterAddress,

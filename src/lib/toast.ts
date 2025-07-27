@@ -112,4 +112,12 @@ export const groveToast = {
       autoClose: 2000,
     });
   },
+
+  achievement: (title: string, description: string) => {
+    toast.success(`${title}\n${description}`, {
+      ...defaultOptions,
+      autoClose: 8000,
+      className: "achievement-toast",
+    });
+  },
 };

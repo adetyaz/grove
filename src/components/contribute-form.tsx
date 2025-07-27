@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
+import { useAchievements } from "@/hooks/useAchievements";
+import { useStreakTracking } from "@/hooks/useStreakTracking";
 import { parseEther } from "viem";
 import { groveToast } from "@/lib/toast";
 // import { achievementNFTContract } from "@/lib/achievementnft-contract"; // Temporarily disabled
@@ -35,6 +37,8 @@ export default function ContributeForm({
   const [hash, setHash] = useState<string | undefined>(undefined);
   const { primaryWallet, isConnected } = useDynamicConnection();
   const address = primaryWallet?.address;
+  const { checkAndAwardAchievements } = useAchievements();
+  const { recordActivity, checkStreakAchievement } = useStreakTracking();
 
   const { writeContractAsync } = useWriteContract();
 
@@ -127,30 +131,48 @@ export default function ContributeForm({
         }
       }
 
-      // === Step 5: Automatic Achievement Minting (TEMPORARILY DISABLED) ===
-      // TODO: Replace this with real milestone logic
-      // NOTE: Disabled due to OwnableUnauthorizedAccount error - will fix later
-      /*
+      // === Step 5: Achievement & Milestone Detection ===
+      // Check and award achievements based on contribution using smart contracts
+
+      // Fetch user's contribution history for achievement calculation
       try {
-        if (address) {
-          const achievementId = "contributor";
-          const tokenURI = "https://example.com/achievement/contributor";
-          await achievementNFTContract.mintAchievement(
-            address as `0x${string}`,
-            achievementId,
-            tokenURI,
-            address as `0x${string}`
-          );
-          groveToast.success("Achievement NFT minted for your contribution!");
-        }
-      } catch (mintErr: any) {
-        groveToast.error(
-          "Failed to mint achievement NFT: " +
-            (mintErr?.message || "Unknown error")
+        const userStatsResponse = await fetch(
+          `/api/user/stats?address=${address}`
         );
+        if (userStatsResponse.ok) {
+          const userStats = await userStatsResponse.json();
+
+          // Calculate new totals including this contribution
+          const contributionWei = parseEther(amount);
+          const newTotalContributed =
+            BigInt(userStats.totalContributed || 0) + contributionWei;
+
+          // Check for achievements using smart contract integration
+          await checkAndAwardAchievements({
+            totalContributed: newTotalContributed,
+            circlesCompleted: userStats.circlesCompleted || 0,
+            currentStreak: userStats.currentStreak || 0,
+            invitedMembers: userStats.invitedMembers || 0,
+            isFirstContribution: userStats.totalContributions === 0, // First time contributing
+          });
+        }
+      } catch (error) {
+        console.warn("Could not check achievements:", error);
+        // Don't fail the contribution if achievement checking fails
       }
-      */
-      // === End Step 5 logic ===
+
+      // === Phase 2: Track streak activity ===
+      try {
+        const streakResult = await recordActivity("CONTRIBUTION");
+        if (streakResult?.achievementEarned) {
+          groveToast.achievement(
+            "🔥 Streak Achievement!",
+            "You've earned the Consistency King achievement!"
+          );
+        }
+      } catch (error) {
+        console.warn("Could not track streak:", error);
+      }
     },
     onSuccess: () => {
       groveToast.contributionMade(`${amount} BTC`);
@@ -205,10 +227,10 @@ export default function ContributeForm({
   };
 
   return (
-    <div className='fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50'>
-      <div className='bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 max-w-md w-full'>
+    <div className='fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in'>
+      <div className='bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 max-w-md w-full hover-lift'>
         <div className='text-center mb-6'>
-          <div className='w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4'>
+          <div className='w-16 h-16 bg-gradient-to-br from-secondary to-secondary/80 rounded-full flex items-center justify-center mx-auto mb-4 glow'>
             <span className='text-2xl'>💰</span>
           </div>
           <h2 className='text-2xl font-bold text-white mb-2'>
@@ -221,30 +243,30 @@ export default function ContributeForm({
 
         {/* Membership Status Check */}
         {!onChainId || onChainId === 0 ? (
-          <div className='bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-4 mb-6'>
-            <p className='text-yellow-200 text-sm text-center'>
+          <div className='bg-accent/20 border border-accent/30 rounded-lg p-4 mb-6'>
+            <p className='text-accent text-sm text-center'>
               <span className='mr-2'>⚠️</span>
               Circle is not yet synced with blockchain. Please wait for the
               circle to be deployed or try again later.
             </p>
-            <div className='text-xs text-yellow-300 mt-2 text-center'>
+            <div className='text-xs text-gray-300 mt-2 text-center'>
               onChainId: {onChainId || "null"} • Address: {address?.slice(0, 6)}
               ...{address?.slice(-4)}
             </div>
             <button
-              className='mt-3 w-full py-2 px-4 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors'
+              className='mt-3 w-full py-2 px-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-colors'
               onClick={onClose}
             >
               Close
             </button>
           </div>
         ) : checkingMembership ? (
-          <div className='bg-blue-500/20 border border-blue-500/30 rounded-lg p-4 mb-6'>
-            <p className='text-blue-200 text-sm text-center'>
+          <div className='bg-trust/20 border border-trust/30 rounded-lg p-4 mb-6'>
+            <p className='text-trust text-sm text-center'>
               <span className='animate-spin inline-block mr-2'>⏳</span>
               Checking membership status...
             </p>
-            <div className='text-xs text-blue-300 mt-2 text-center'>
+            <div className='text-xs text-gray-300 mt-2 text-center'>
               Verifying on Circle ID {onChainId} for {address?.slice(0, 6)}...
               {address?.slice(-4)}
             </div>
@@ -368,7 +390,7 @@ export default function ContributeForm({
                 min='0'
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className='w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'
+                className='w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition-all duration-300'
                 placeholder='0.001'
                 required
               />
@@ -389,7 +411,7 @@ export default function ContributeForm({
               <button
                 type='button'
                 onClick={onClose}
-                className='flex-1 py-3 px-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-colors'
+                className='flex-1 py-3 px-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-all duration-300'
                 disabled={mutation.isPending}
               >
                 Cancel
@@ -397,17 +419,17 @@ export default function ContributeForm({
               <button
                 type='submit'
                 disabled={!amount || mutation.isPending}
-                className='flex-1 py-3 px-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-all duration-200'
+                className='flex-1 py-3 px-4 bg-gradient-to-r from-secondary to-secondary/90 hover:from-secondary/90 hover:to-secondary disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-all duration-300 hover-lift shadow-lg hover:shadow-secondary/25'
               >
                 {mutation.isPending ? "Contributing..." : "Contribute"}
               </button>
             </div>
 
             {mutation.isPending && !timeoutReached && (
-              <div className='bg-blue-500/20 border border-blue-500/30 rounded-lg p-4'>
+              <div className='bg-trust/20 border border-trust/30 rounded-lg p-4'>
                 <div className='flex items-center space-x-2'>
-                  <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400'></div>
-                  <p className='text-blue-200 text-sm'>
+                  <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-trust'></div>
+                  <p className='text-trust text-sm'>
                     {"Processing contribution..."}
                   </p>
                 </div>

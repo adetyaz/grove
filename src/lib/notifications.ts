@@ -1,16 +1,17 @@
-import TelegramBot from "node-telegram-bot-api";
-import { Twilio } from "twilio";
+// Commented out for app focus - Telegram and WhatsApp functionality
+// import TelegramBot from "node-telegram-bot-api";
+// import { Twilio } from "twilio";
 
-// Telegram Bot Configuration
-const telegramBot = process.env.TELEGRAM_BOT_TOKEN
-  ? new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false })
-  : null;
+// Telegram Bot Configuration - Commented out
+// const telegramBot = process.env.TELEGRAM_BOT_TOKEN
+//   ? new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false })
+//   : null;
 
-// Twilio Configuration for WhatsApp
-const twilioClient =
-  process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
-    ? new Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
-    : null;
+// Twilio Configuration for WhatsApp - Commented out
+// const twilioClient =
+//   process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
+//     ? new Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+//     : null;
 
 // Notification types
 export type NotificationType =
@@ -20,7 +21,8 @@ export type NotificationType =
   | "goal_reached"
   | "reminder";
 
-// Telegram service
+// Telegram service - Commented out for app focus
+/*
 export const telegramService = {
   // Send message to Telegram chat
   sendMessage: async (chatId: string, message: string, options?: any) => {
@@ -94,7 +96,8 @@ ${data.details}
   },
 };
 
-// WhatsApp service using Twilio
+// WhatsApp service using Twilio - Commented out for app focus
+/*
 export const whatsappService = {
   // Send WhatsApp message
   sendMessage: async (to: string, message: string) => {
@@ -167,6 +170,7 @@ View circle: ${data.circleLink}
     `;
   },
 };
+*/
 
 // Multi-channel notification service
 export const notificationService = {
@@ -188,16 +192,17 @@ export const notificationService = {
         error: null as string | null,
         messageId: null as string | null,
       },
-      telegram: {
-        success: false,
-        error: null as string | null,
-        messageId: null as string | null,
-      },
-      whatsapp: {
-        success: false,
-        error: null as string | null,
-        messageId: null as string | null,
-      },
+      // Commented out for app focus
+      // telegram: {
+      //   success: false,
+      //   error: null as string | null,
+      //   messageId: null as string | null,
+      // },
+      // whatsapp: {
+      //   success: false,
+      //   error: null as string | null,
+      //   messageId: null as string | null,
+      // },
     };
 
     // Send email (primary method)
@@ -221,6 +226,8 @@ export const notificationService = {
       };
     }
 
+    // Telegram and WhatsApp notifications commented out for app focus
+    /*
     // Send Telegram notification (if chat ID provided)
     if (invitation.recipientTelegram) {
       const telegramMessage = telegramService.formatInviteMessage(invitation);
@@ -248,6 +255,7 @@ export const notificationService = {
         messageId: whatsappResult.messageId || null,
       };
     }
+    */
 
     return results;
   },
@@ -274,16 +282,17 @@ export const notificationService = {
           error: null as string | null,
           messageId: null as string | null,
         },
-        telegram: {
-          success: false,
-          error: null as string | null,
-          messageId: null as string | null,
-        },
-        whatsapp: {
-          success: false,
-          error: null as string | null,
-          messageId: null as string | null,
-        },
+        // Commented out for app focus
+        // telegram: {
+        //   success: false,
+        //   error: null as string | null,
+        //   messageId: null as string | null,
+        // },
+        // whatsapp: {
+        //   success: false,
+        //   error: null as string | null,
+        //   messageId: null as string | null,
+        // },
       };
 
       // Send email (need to create a proper template for updates)
@@ -309,6 +318,8 @@ export const notificationService = {
         };
       }
 
+      // Telegram and WhatsApp updates commented out for app focus
+      /*
       // Send Telegram
       if (recipient.telegram) {
         const telegramMessage = telegramService.formatUpdateMessage(update);
@@ -336,6 +347,7 @@ export const notificationService = {
           messageId: whatsappResult.messageId || null,
         };
       }
+      */
 
       results.push({ recipient: recipient.email, results: recipientResults });
     }
@@ -347,8 +359,9 @@ export const notificationService = {
   testServices: async (testEmail?: string) => {
     const results = {
       email: false,
-      telegram: !!telegramBot,
-      whatsapp: !!twilioClient,
+      // Commented out for app focus
+      // telegram: !!telegramBot,
+      // whatsapp: !!twilioClient,
     };
 
     // Test email with a test email if provided

@@ -5,13 +5,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import ConnectedUserSection from "@/components/connected-user-section";
 import WalletButton from "@/components/wallet-button";
 
-import { Shield, Users, Star, Menu, Target, Zap, Globe } from "lucide-react";
+import { Shield, Users, Star, Menu, Target, Zap, Globe, X } from "lucide-react";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { useState, useEffect, useMemo } from "react";
 
 export default function Home() {
   const { user, primaryWallet, isConnecting } = useDynamicConnection();
   const [mounted, setMounted] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const connectionState = useMemo(
     () => ({
@@ -41,24 +42,30 @@ export default function Home() {
   }
 
   return (
-    <div className='min-h-screen bg-gray-900 text-white'>
+    <div className='min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white'>
       {/* Header */}
-      <header className='flex items-center justify-between p-4 lg:px-8'>
+      <header className='flex items-center justify-between p-4 lg:px-8 backdrop-blur-sm bg-white/5 sticky top-0 z-50'>
         <div className='flex items-center space-x-8'>
-          <Link href='/' className='text-2xl font-bold text-green-400'>
+          <Link href='/' className='text-2xl font-bold text-primary'>
             🌳 Grove
           </Link>
           <nav className='hidden lg:flex space-x-6'>
-            <Link href='#features' className='text-gray-300 hover:text-white'>
+            <Link
+              href='#features'
+              className='text-gray-300 hover:text-primary transition-colors'
+            >
               Features
             </Link>
             <Link
               href='#how-it-works'
-              className='text-gray-300 hover:text-white'
+              className='text-gray-300 hover:text-primary transition-colors'
             >
               How It Works
             </Link>
-            <Link href='#security' className='text-gray-300 hover:text-white'>
+            <Link
+              href='#security'
+              className='text-gray-300 hover:text-primary transition-colors'
+            >
               Security
             </Link>
           </nav>
@@ -68,16 +75,16 @@ export default function Home() {
             <>
               <WalletButton
                 variant='ghost'
-                className='hidden lg:inline-flex text-white'
+                className='hidden lg:inline-flex text-white hover:text-primary'
               />
               <Link
                 href='/dashboard'
-                className='hidden lg:inline-flex text-gray-300 hover:text-white transition-colors'
+                className='hidden lg:inline-flex text-gray-300 hover:text-primary transition-colors'
               >
                 Dashboard
               </Link>
-              <Link href='/create'>
-                <Button className='bg-orange-500 hover:bg-orange-600 text-white'>
+              <Link href='/create' className='hidden sm:block'>
+                <Button className='bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/25'>
                   Create Circle
                 </Button>
               </Link>
@@ -86,59 +93,125 @@ export default function Home() {
             <>
               <WalletButton
                 variant='ghost'
-                className='hidden lg:inline-flex text-white'
+                className='hidden lg:inline-flex text-white hover:text-primary'
               >
                 {connectionState.isConnecting
                   ? "Connecting..."
                   : "Connect Wallet"}
               </WalletButton>
               <Link href='/create'>
-                <Button className='bg-orange-500 hover:bg-orange-600 text-white'>
+                <Button className='bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/25'>
                   Get Started
                 </Button>
               </Link>
             </>
           )}
-          <Button variant='ghost' size='icon' className='lg:hidden'>
-            <Menu className='h-6 w-6' />
+          <Button
+            variant='ghost'
+            size='icon'
+            className='lg:hidden hover:text-primary'
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? (
+              <X className='h-6 w-6' />
+            ) : (
+              <Menu className='h-6 w-6' />
+            )}
           </Button>
         </div>
+
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className='lg:hidden absolute top-full left-0 w-full bg-slate-900/95 backdrop-blur-sm border-t border-white/10'>
+            <nav className='flex flex-col p-4 space-y-4'>
+              <Link
+                href='#features'
+                className='text-gray-300 hover:text-primary transition-colors py-2'
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Features
+              </Link>
+              <Link
+                href='#how-it-works'
+                className='text-gray-300 hover:text-primary transition-colors py-2'
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                How It Works
+              </Link>
+              <Link
+                href='#security'
+                className='text-gray-300 hover:text-primary transition-colors py-2'
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Security
+              </Link>
+              {connectionState.isConnected && (
+                <Link
+                  href='/dashboard'
+                  className='text-gray-300 hover:text-primary transition-colors py-2'
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Dashboard
+                </Link>
+              )}
+              <div className='pt-4 border-t border-white/10'>
+                {!connectionState.isConnected && (
+                  <WalletButton
+                    variant='outline'
+                    className='w-full mb-3 border-primary text-primary hover:bg-primary hover:text-white'
+                  >
+                    {connectionState.isConnecting
+                      ? "Connecting..."
+                      : "Connect Wallet"}
+                  </WalletButton>
+                )}
+                <Link href='/create' onClick={() => setMobileMenuOpen(false)}>
+                  <Button className='w-full bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/25'>
+                    {connectionState.isConnected
+                      ? "Create Circle"
+                      : "Get Started"}
+                  </Button>
+                </Link>
+              </div>
+            </nav>
+          </div>
+        )}
       </header>
 
       {/* Hero Section */}
-      <section className='px-4 lg:px-8 py-16 lg:py-24'>
-        <div className='max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center'>
-          <div>
-            <h1 className='text-4xl lg:text-6xl font-bold leading-tight mb-6'>
+      <section className='px-4 lg:px-8 py-12 lg:py-24'>
+        <div className='max-w-7xl mx-auto grid lg:grid-cols-2 gap-8 lg:gap-12 items-center'>
+          <div className='text-center lg:text-left animate-fade-in'>
+            <h1 className='text-3xl sm:text-4xl lg:text-6xl font-bold leading-tight mb-4 lg:mb-6'>
               Cultivate wealth through{" "}
-              <span className='text-orange-400'>Bitcoin</span> collaboration
+              <span className='text-primary'>Bitcoin</span> collaboration
             </h1>
-            <p className='text-xl text-gray-300 mb-8'>
+            <p className='text-lg sm:text-xl text-gray-300 mb-6 lg:mb-8 max-w-2xl mx-auto lg:mx-0 animate-slide-up'>
               Grove empowers communities to grow their Bitcoin savings together.
               Create circles with family and friends, track shared goals, and
               build financial security on Bitcoin&apos;s most advanced Layer 2.
             </p>
-            <div className='flex flex-col sm:flex-row gap-4'>
-              <Link href='/create'>
-                <Button className='bg-orange-500 hover:bg-orange-600 text-white text-lg px-8 py-3'>
-                  Plant Your Grove
+            <div className='flex flex-col sm:flex-row gap-4 justify-center lg:justify-start animate-slide-up'>
+              <Link href='/create' className='w-full sm:w-auto'>
+                <Button className='w-full sm:w-auto bg-primary hover:bg-primary/90 text-white text-lg px-8 py-3 shadow-lg shadow-primary/25 hover-lift'>
+                  🌱 Plant Your Grove
                 </Button>
               </Link>
             </div>
           </div>
-          <div className='relative'>
-            <div className='relative w-full h-96 flex items-center justify-center'>
-              <div className='w-48 h-48 bg-gradient-to-br from-orange-500 to-green-500 rounded-full flex items-center justify-center relative'>
-                <div className='text-6xl'>🌳</div>
-                <div className='absolute -top-4 -right-4 w-16 h-16 bg-orange-400 rounded-full flex items-center justify-center'>
-                  <span className='text-2xl'>₿</span>
+          <div className='relative order-first lg:order-last animate-fade-in'>
+            <div className='relative w-full h-72 sm:h-96 flex items-center justify-center'>
+              <div className='w-40 sm:w-48 h-40 sm:h-48 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center relative shadow-2xl shadow-primary/30 animate-bounce-subtle'>
+                <div className='text-4xl sm:text-6xl'>🌳</div>
+                <div className='absolute -top-3 sm:-top-4 -right-3 sm:-right-4 w-12 sm:w-16 h-12 sm:h-16 bg-accent rounded-full flex items-center justify-center shadow-lg shadow-accent/30 animate-glow'>
+                  <span className='text-lg sm:text-2xl'>₿</span>
                 </div>
               </div>
-              <div className='absolute top-8 left-8 w-8 h-8 bg-blue-400 rounded-full flex items-center justify-center'>
-                <Users className='w-4 h-4 text-white' />
+              <div className='absolute top-6 sm:top-8 left-6 sm:left-8 w-6 sm:w-8 h-6 sm:h-8 bg-grove-trust rounded-full flex items-center justify-center shadow-lg hover-lift'>
+                <Users className='w-3 sm:w-4 h-3 sm:h-4 text-white' />
               </div>
-              <div className='absolute bottom-8 right-8 w-8 h-8 bg-green-400 rounded-full flex items-center justify-center'>
-                <Target className='w-4 h-4 text-white' />
+              <div className='absolute bottom-6 sm:bottom-8 right-6 sm:right-8 w-6 sm:w-8 h-6 sm:h-8 bg-secondary rounded-full flex items-center justify-center shadow-lg hover-lift'>
+                <Target className='w-3 sm:w-4 h-3 sm:h-4 text-white' />
               </div>
             </div>
           </div>
@@ -169,24 +242,24 @@ export default function Home() {
       )}
 
       {/* Features Grid */}
-      <section id='features' className='px-4 lg:px-8 py-16'>
+      <section id='features' className='px-4 lg:px-8 py-12 lg:py-16'>
         <div className='max-w-7xl mx-auto'>
-          <div className='text-center mb-16'>
-            <h2 className='text-4xl font-bold text-white mb-4'>
+          <div className='text-center mb-12 lg:mb-16'>
+            <h2 className='text-3xl sm:text-4xl font-bold text-white mb-4'>
               Growing Wealth Together
             </h2>
-            <p className='text-xl text-gray-300 max-w-3xl mx-auto'>
+            <p className='text-lg sm:text-xl text-gray-300 max-w-3xl mx-auto'>
               Experience the future of collaborative savings with Bitcoin-native
               features
             </p>
           </div>
-          <div className='grid gap-8'>
+          <div className='grid gap-6 lg:gap-8'>
             {/* Collaborative Circles Card */}
-            <Card className='bg-gray-800 border-gray-700 p-8'>
-              <CardContent className='grid lg:grid-cols-2 gap-8 items-center p-0'>
+            <Card className='bg-white/5 backdrop-blur-sm border-white/10 p-6 lg:p-8 hover:border-primary/30 transition-all duration-300 hover-lift animate-fade-in'>
+              <CardContent className='grid lg:grid-cols-2 gap-6 lg:gap-8 items-center p-0'>
                 <div>
-                  <h2 className='text-3xl font-bold mb-4 text-white'>
-                    Community Savings Trees
+                  <h2 className='text-2xl sm:text-3xl font-bold mb-4 text-white'>
+                    🌱 Community Savings Trees
                   </h2>
                   <p className='text-gray-300 mb-6'>
                     Plant savings trees with your community. Set collective
@@ -197,22 +270,22 @@ export default function Home() {
                   <Link href='/create'>
                     <Button
                       variant='outline'
-                      className='border-orange-500 text-orange-300 hover:bg-orange-500 hover:text-white transition-colors'
+                      className='border-primary text-primary hover:bg-primary hover:text-white transition-colors shadow-lg shadow-primary/25'
                     >
-                      Plant Your Tree
+                      🌳 Plant Your Tree
                     </Button>
                   </Link>
                 </div>
                 <div className='relative'>
-                  <div className='bg-gray-900 rounded-lg p-6 text-center'>
-                    <div className='text-4xl font-bold text-orange-400 mb-2'>
+                  <div className='bg-slate-900/80 backdrop-blur-sm rounded-lg p-6 text-center border border-primary/20'>
+                    <div className='text-4xl font-bold text-primary mb-2'>
                       ₿ 0.25000000
                     </div>
                     <div className='text-sm text-gray-400 mb-4'>
                       Jaime&apos;s College Fund
                     </div>
                     <div className='flex justify-center space-x-2'>
-                      <div className='w-8 h-8 bg-blue-400 rounded-full flex items-center justify-center'>
+                      <div className='w-8 h-8 bg-secondary rounded-full flex items-center justify-center'>
                         <Users className='w-4 h-4 text-white' />
                       </div>
                       <div className='text-sm text-gray-300 flex items-center'>
@@ -225,11 +298,11 @@ export default function Home() {
             </Card>
 
             {/* Gamification Card */}
-            <Card className='bg-gray-800 border-gray-700 p-8'>
+            <Card className='bg-white/5 backdrop-blur-sm border-white/10 p-8 hover:border-accent/30 transition-all duration-300 hover-lift animate-fade-in'>
               <CardContent className='grid lg:grid-cols-2 gap-8 items-center p-0'>
                 <div>
                   <h2 className='text-3xl font-bold mb-4 text-white'>
-                    Growth Rewards & Recognition
+                    🏆 Growth Rewards & Recognition
                   </h2>
                   <p className='text-gray-300 mb-6'>
                     Celebrate your savings journey with on-chain achievements.
@@ -238,27 +311,27 @@ export default function Home() {
                   </p>
                   <Button
                     variant='outline'
-                    className='border-purple-500 text-purple-300 hover:bg-purple-500 hover:text-white transition-colors'
+                    className='border-accent text-accent hover:bg-accent hover:text-white transition-colors shadow-lg shadow-accent/25'
                   >
-                    View Progress
+                    ✨ View Progress
                   </Button>
                 </div>
                 <div className='relative'>
-                  <div className='bg-gray-900 rounded-lg p-4'>
+                  <div className='bg-slate-900/80 backdrop-blur-sm rounded-lg p-4 border border-accent/20'>
                     <div className='flex items-center space-x-3 mb-3'>
-                      <div className='w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center'>
+                      <div className='w-8 h-8 bg-accent rounded-full flex items-center justify-center'>
                         <span className='text-white text-sm'>🔥</span>
                       </div>
                       <span className='text-white'>30-day streak</span>
                     </div>
                     <div className='flex items-center space-x-3 mb-3'>
-                      <div className='w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center'>
+                      <div className='w-8 h-8 bg-accent rounded-full flex items-center justify-center'>
                         <span className='text-white text-sm'>🏆</span>
                       </div>
                       <span className='text-white'>Goal Crusher NFT</span>
                     </div>
                     <div className='flex items-center space-x-3'>
-                      <div className='w-8 h-8 bg-green-500 rounded-full flex items-center justify-center'>
+                      <div className='w-8 h-8 bg-secondary rounded-full flex items-center justify-center'>
                         <span className='text-white text-sm'>#5</span>
                       </div>
                       <span className='text-white'>Global Leaderboard</span>
@@ -269,30 +342,30 @@ export default function Home() {
             </Card>
 
             {/* Cross-Chain Deposits Card */}
-            <Card className='bg-gray-800 border-gray-700 p-8'>
+            <Card className='bg-white/5 backdrop-blur-sm border-white/10 p-8 hover:border-grove-trust/30 transition-all duration-300 hover-lift animate-fade-in'>
               <CardContent className='grid lg:grid-cols-2 gap-8 items-center p-0'>
                 <div className='relative'>
                   <div className='flex items-center justify-center'>
-                    <div className='w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center relative'>
+                    <div className='w-32 h-32 bg-gradient-to-br from-grove-trust to-primary rounded-full flex items-center justify-center relative shadow-lg shadow-grove-trust/25'>
                       <Globe className='w-16 h-16 text-white' />
                     </div>
                   </div>
                   <div className='flex justify-center space-x-2 mt-4'>
-                    <div className='w-3 h-3 bg-blue-400 rounded-full'></div>
-                    <div className='w-3 h-3 bg-purple-400 rounded-full'></div>
-                    <div className='w-3 h-3 bg-orange-400 rounded-full'></div>
-                    <div className='w-3 h-3 bg-green-400 rounded-full'></div>
+                    <div className='w-3 h-3 bg-grove-trust rounded-full'></div>
+                    <div className='w-3 h-3 bg-accent rounded-full'></div>
+                    <div className='w-3 h-3 bg-primary rounded-full'></div>
+                    <div className='w-3 h-3 bg-secondary rounded-full'></div>
                   </div>
                 </div>
                 <div>
                   <div className='flex items-center space-x-2 mb-4'>
-                    <div className='w-3 h-3 bg-green-400 rounded-full'></div>
+                    <div className='w-3 h-3 bg-secondary rounded-full'></div>
                     <span className='text-sm text-gray-400'>
                       Powered by Hyperlane
                     </span>
                   </div>
                   <h2 className='text-3xl font-bold mb-4 text-white'>
-                    Universal Asset Gateway
+                    🌉 Universal Asset Gateway
                   </h2>
                   <p className='text-gray-300 mb-6'>
                     Seamlessly contribute from any blockchain ecosystem. Grove
@@ -302,20 +375,20 @@ export default function Home() {
                   </p>
                   <Button
                     variant='outline'
-                    className='border-blue-500 text-blue-300 hover:bg-blue-500 hover:text-white transition-colors'
+                    className='border-grove-trust text-grove-trust hover:bg-grove-trust hover:text-white transition-colors shadow-lg shadow-grove-trust/25'
                   >
-                    Connect Assets
+                    🔗 Connect Assets
                   </Button>
                 </div>
               </CardContent>
             </Card>
 
             {/* Inheritance Planning Card */}
-            <Card className='bg-gray-800 border-gray-700 p-8'>
+            <Card className='bg-white/5 backdrop-blur-sm border-white/10 p-8 hover:border-secondary/30 transition-all duration-300 hover-lift animate-fade-in'>
               <CardContent className='grid lg:grid-cols-2 gap-8 items-center p-0'>
                 <div>
                   <h2 className='text-3xl font-bold mb-4 text-white'>
-                    Legacy Protection Protocol
+                    🛡️ Legacy Protection Protocol
                   </h2>
                   <p className='text-gray-300 mb-6'>
                     Protect your Bitcoin legacy with programmable inheritance
@@ -324,48 +397,48 @@ export default function Home() {
                   </p>
                   <Button
                     variant='outline'
-                    className='border-green-500 text-green-300 hover:bg-green-500 hover:text-white transition-colors'
+                    className='border-secondary text-secondary hover:bg-secondary hover:text-white transition-colors shadow-lg shadow-secondary/25'
                   >
-                    Secure Legacy
+                    🔒 Secure Legacy
                   </Button>
                 </div>
                 <div className='relative'>
-                  <div className='bg-gray-900 rounded-lg p-6 text-center'>
+                  <div className='bg-slate-900/80 backdrop-blur-sm rounded-lg p-6 text-center border border-secondary/20'>
                     <div className='w-24 h-24 mx-auto mb-4 relative'>
-                      <Shield className='w-full h-full text-blue-600' />
+                      <Shield className='w-full h-full text-grove-trust' />
                     </div>
-                    <div className='text-orange-500 font-bold'>₿ Protected</div>
-                    <div className='text-blue-600'>ZK-Proof Secured</div>
+                    <div className='text-primary font-bold'>₿ Protected</div>
+                    <div className='text-grove-trust'>ZK-Proof Secured</div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* Social Gifting Card */}
-            <Card className='bg-gray-800 border-gray-700 p-8'>
+            <Card className='bg-white/5 backdrop-blur-sm border-white/10 p-8 hover:border-grove-premium/30 transition-all duration-300 hover-lift animate-fade-in'>
               <CardContent className='grid lg:grid-cols-2 gap-8 items-center p-0'>
                 <div className='relative'>
-                  <div className='bg-gray-900 rounded-lg p-6'>
+                  <div className='bg-slate-900/80 backdrop-blur-sm rounded-lg p-6 border border-grove-premium/20'>
                     <div className='flex items-center space-x-4 mb-4'>
-                      <div className='w-12 h-8 bg-orange-500 rounded flex items-center justify-center'>
+                      <div className='w-12 h-8 bg-primary rounded flex items-center justify-center'>
                         <span className='text-white text-xs font-bold'>
                           GIFT
                         </span>
                       </div>
                       <div className='flex space-x-2'>
-                        <div className='w-6 h-4 bg-blue-500 rounded'></div>
-                        <div className='w-6 h-4 bg-green-400 rounded'></div>
-                        <div className='w-6 h-4 bg-orange-500 rounded'></div>
+                        <div className='w-6 h-4 bg-grove-trust rounded'></div>
+                        <div className='w-6 h-4 bg-secondary rounded'></div>
+                        <div className='w-6 h-4 bg-primary rounded'></div>
                       </div>
                     </div>
                     <div className='grid grid-cols-3 gap-2'>
-                      <div className='w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white text-xs'>
+                      <div className='w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white text-xs'>
                         ₿
                       </div>
-                      <div className='w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-xs'>
+                      <div className='w-8 h-8 bg-secondary rounded-full flex items-center justify-center text-white text-xs'>
                         🎁
                       </div>
-                      <div className='w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs'>
+                      <div className='w-8 h-8 bg-grove-trust rounded-full flex items-center justify-center text-white text-xs'>
                         💝
                       </div>
                     </div>
@@ -373,7 +446,7 @@ export default function Home() {
                 </div>
                 <div>
                   <h2 className='text-3xl font-bold mb-4 text-white'>
-                    Social Bitcoin Gifting
+                    🎁 Social Bitcoin Gifting
                   </h2>
                   <p className='text-gray-300 mb-6'>
                     Send Bitcoin gifts to friends and family with personal
@@ -382,20 +455,20 @@ export default function Home() {
                   </p>
                   <Button
                     variant='outline'
-                    className='border-pink-500 text-pink-300 hover:bg-pink-500 hover:text-white transition-colors'
+                    className='border-grove-premium text-grove-premium hover:bg-grove-premium hover:text-white transition-colors shadow-lg shadow-grove-premium/25'
                   >
-                    Send Gift
+                    💌 Send Gift
                   </Button>
                 </div>
               </CardContent>
             </Card>
 
             {/* Bitcoin Security Card */}
-            <Card className='bg-gray-800 border-gray-700 p-8'>
+            <Card className='bg-white/5 backdrop-blur-sm border-white/10 p-8 hover:border-accent/30 transition-all duration-300 hover-lift animate-fade-in'>
               <CardContent className='grid lg:grid-cols-2 gap-8 items-center p-0'>
                 <div>
                   <h2 className='text-3xl font-bold mb-4 text-white'>
-                    Bitcoin-Native Security
+                    ₿ Bitcoin-Native Security
                   </h2>
                   <p className='text-gray-300 mb-6'>
                     All transactions settle on Bitcoin L1 via Citrea&apos;s
@@ -404,45 +477,45 @@ export default function Home() {
                   </p>
                   <Button
                     variant='outline'
-                    className='border-yellow-500 text-yellow-300 hover:bg-yellow-500 hover:text-black transition-colors'
+                    className='border-accent text-accent hover:bg-accent hover:text-white transition-colors shadow-lg shadow-accent/25'
                   >
-                    Learn More
+                    🔍 Learn More
                   </Button>
                 </div>
                 <div className='relative'>
                   <div className='flex items-center justify-center'>
                     <div className='relative'>
-                      <div className='w-32 h-20 bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-600 rounded-lg flex items-center justify-center'>
+                      <div className='w-32 h-20 bg-gradient-to-r from-primary via-accent to-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/25'>
                         <span className='text-3xl font-bold text-white'>₿</span>
                       </div>
                     </div>
                   </div>
                   <div className='flex justify-center space-x-2 mt-4'>
-                    <div className='w-3 h-3 bg-orange-400 rounded-full'></div>
-                    <div className='w-3 h-3 bg-yellow-400 rounded-full'></div>
-                    <div className='w-3 h-3 bg-orange-400 rounded-full'></div>
+                    <div className='w-3 h-3 bg-primary rounded-full'></div>
+                    <div className='w-3 h-3 bg-accent rounded-full'></div>
+                    <div className='w-3 h-3 bg-primary rounded-full'></div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* Settlement Card */}
-            <Card className='bg-gray-800 border-gray-700 p-8'>
+            <Card className='bg-white/5 backdrop-blur-sm border-white/10 p-8 hover:border-grove-trust/30 transition-all duration-300 hover-lift animate-fade-in'>
               <CardContent className='grid lg:grid-cols-2 gap-8 items-center p-0'>
                 <div className='relative'>
-                  <div className='bg-gray-900 rounded-lg p-6 text-center'>
-                    <div className='text-4xl font-bold text-orange-400 mb-2'>
+                  <div className='bg-slate-900/80 backdrop-blur-sm rounded-lg p-6 text-center border border-grove-trust/20'>
+                    <div className='text-4xl font-bold text-primary mb-2'>
                       ₿ 2.10000000
                     </div>
                     <div className='flex items-center justify-center space-x-2 mb-4'>
-                      <Zap className='w-8 h-8 text-yellow-400' />
+                      <Zap className='w-8 h-8 text-accent' />
                     </div>
                     <div className='flex justify-center space-x-1'>
-                      <Star className='w-4 h-4 text-yellow-400 fill-current' />
-                      <Star className='w-4 h-4 text-yellow-400 fill-current' />
-                      <Star className='w-4 h-4 text-yellow-400 fill-current' />
-                      <Star className='w-4 h-4 text-yellow-400 fill-current' />
-                      <Star className='w-4 h-4 text-yellow-400 fill-current' />
+                      <Star className='w-4 h-4 text-accent fill-current' />
+                      <Star className='w-4 h-4 text-accent fill-current' />
+                      <Star className='w-4 h-4 text-accent fill-current' />
+                      <Star className='w-4 h-4 text-accent fill-current' />
+                      <Star className='w-4 h-4 text-accent fill-current' />
                     </div>
                     <div className='text-sm text-gray-400 mt-2'>
                       Citrea ZK-Rollup
@@ -451,7 +524,7 @@ export default function Home() {
                 </div>
                 <div>
                   <h2 className='text-3xl font-bold mb-4 text-white'>
-                    Lightning-Fast Settlement
+                    ⚡ Lightning-Fast Settlement
                   </h2>
                   <p className='text-gray-300 mb-6'>
                     Experience instant transactions with Bitcoin finality.
@@ -460,9 +533,9 @@ export default function Home() {
                   </p>
                   <Button
                     variant='outline'
-                    className='border-cyan-500 text-cyan-300 hover:bg-cyan-500 hover:text-white transition-colors'
+                    className='border-grove-trust text-grove-trust hover:bg-grove-trust hover:text-white transition-colors shadow-lg shadow-grove-trust/25'
                   >
-                    Explore Citrea
+                    🚀 Explore Citrea
                   </Button>
                 </div>
               </CardContent>
@@ -472,58 +545,61 @@ export default function Home() {
       </section>
 
       {/* How It Works Section */}
-      <section id='how-it-works' className='px-4 lg:px-8 py-16 bg-gray-800/50'>
+      <section
+        id='how-it-works'
+        className='px-4 lg:px-8 py-12 lg:py-16 bg-slate-900/50 backdrop-blur-sm'
+      >
         <div className='max-w-7xl mx-auto'>
-          <div className='text-center mb-16'>
-            <h2 className='text-4xl font-bold text-white mb-4'>
+          <div className='text-center mb-12 lg:mb-16'>
+            <h2 className='text-3xl sm:text-4xl font-bold text-white mb-4'>
               How Grove Works
             </h2>
-            <p className='text-xl text-gray-300 max-w-3xl mx-auto'>
+            <p className='text-lg sm:text-xl text-gray-300 max-w-3xl mx-auto'>
               Simple steps to start your Bitcoin savings journey
             </p>
           </div>
-          <div className='grid lg:grid-cols-4 gap-8'>
+          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8'>
             <div className='text-center'>
-              <div className='w-16 h-16 bg-orange-500 rounded-full flex items-center justify-center mx-auto mb-4'>
-                <span className='text-2xl'>1</span>
+              <div className='w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/25'>
+                <span className='text-2xl font-bold text-white'>1</span>
               </div>
-              <h3 className='text-xl font-semibold text-white mb-2'>
-                Connect Wallet
+              <h3 className='text-lg sm:text-xl font-semibold text-white mb-2'>
+                🔗 Connect Wallet
               </h3>
-              <p className='text-gray-300'>
+              <p className='text-sm sm:text-base text-gray-300'>
                 Connect your wallet using Dynamic.xyz for seamless onboarding
               </p>
             </div>
             <div className='text-center'>
-              <div className='w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4'>
-                <span className='text-2xl'>2</span>
+              <div className='w-16 h-16 bg-secondary rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-secondary/25'>
+                <span className='text-2xl font-bold text-white'>2</span>
               </div>
-              <h3 className='text-xl font-semibold text-white mb-2'>
-                Create Circle
+              <h3 className='text-lg sm:text-xl font-semibold text-white mb-2'>
+                🌱 Create Circle
               </h3>
-              <p className='text-gray-300'>
+              <p className='text-sm sm:text-base text-gray-300'>
                 Set your savings goal, timeline, and contribution schedule
               </p>
             </div>
             <div className='text-center'>
-              <div className='w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4'>
-                <span className='text-2xl'>3</span>
+              <div className='w-16 h-16 bg-grove-trust rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-grove-trust/25'>
+                <span className='text-2xl font-bold text-white'>3</span>
               </div>
-              <h3 className='text-xl font-semibold text-white mb-2'>
-                Invite Members
+              <h3 className='text-lg sm:text-xl font-semibold text-white mb-2'>
+                👥 Invite Members
               </h3>
-              <p className='text-gray-300'>
+              <p className='text-sm sm:text-base text-gray-300'>
                 Send email invitations to friends and family to join your circle
               </p>
             </div>
             <div className='text-center'>
-              <div className='w-16 h-16 bg-purple-500 rounded-full flex items-center justify-center mx-auto mb-4'>
-                <span className='text-2xl'>4</span>
+              <div className='w-16 h-16 bg-accent rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-accent/25'>
+                <span className='text-2xl font-bold text-white'>4</span>
               </div>
-              <h3 className='text-xl font-semibold text-white mb-2'>
-                Achieve Goals
+              <h3 className='text-lg sm:text-xl font-semibold text-white mb-2'>
+                🎯 Achieve Goals
               </h3>
-              <p className='text-gray-300'>
+              <p className='text-sm sm:text-base text-gray-300'>
                 Track progress, earn achievements, and reach your savings goals
                 together
               </p>
@@ -533,44 +609,44 @@ export default function Home() {
       </section>
 
       {/* Security Section */}
-      <section id='security' className='px-4 lg:px-8 py-16'>
+      <section id='security' className='px-4 lg:px-8 py-12 lg:py-16'>
         <div className='max-w-7xl mx-auto text-center'>
-          <div className='mb-16'>
-            <h2 className='text-4xl font-bold text-white mb-4'>
-              Bitcoin-Level Security
+          <div className='mb-12 lg:mb-16'>
+            <h2 className='text-3xl sm:text-4xl font-bold text-white mb-4'>
+              ₿ Bitcoin-Level Security
             </h2>
-            <p className='text-xl text-gray-300 max-w-3xl mx-auto'>
+            <p className='text-lg sm:text-xl text-gray-300 max-w-3xl mx-auto'>
               Your funds are secured by Bitcoin&apos;s unmatched security
               through Citrea&apos;s ZK-Rollup technology
             </p>
           </div>
-          <div className='grid lg:grid-cols-3 gap-8'>
-            <div className='bg-gray-800 rounded-lg p-8'>
-              <Shield className='w-12 h-12 text-orange-400 mx-auto mb-4' />
-              <h3 className='text-xl font-semibold text-white mb-4'>
-                Bitcoin Settlement
+          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8'>
+            <div className='bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6 lg:p-8 hover:border-primary/30 transition-all duration-300 hover-lift animate-fade-in'>
+              <Shield className='w-10 sm:w-12 h-10 sm:h-12 text-primary mx-auto mb-4' />
+              <h3 className='text-lg sm:text-xl font-semibold text-white mb-4'>
+                ₿ Bitcoin Settlement
               </h3>
-              <p className='text-gray-300'>
+              <p className='text-sm sm:text-base text-gray-300'>
                 All transactions ultimately settle on Bitcoin L1, providing
                 maximum security for your savings
               </p>
             </div>
-            <div className='bg-gray-800 rounded-lg p-8'>
-              <Zap className='w-12 h-12 text-yellow-400 mx-auto mb-4' />
-              <h3 className='text-xl font-semibold text-white mb-4'>
-                ZK-Rollup Technology
+            <div className='bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6 lg:p-8 hover:border-accent/30 transition-all duration-300 hover-lift animate-fade-in'>
+              <Zap className='w-10 sm:w-12 h-10 sm:h-12 text-accent mx-auto mb-4' />
+              <h3 className='text-lg sm:text-xl font-semibold text-white mb-4'>
+                ⚡ ZK-Rollup Technology
               </h3>
-              <p className='text-gray-300'>
+              <p className='text-sm sm:text-base text-gray-300'>
                 Citrea&apos;s zero-knowledge proofs ensure transaction validity
                 while maintaining privacy
               </p>
             </div>
-            <div className='bg-gray-800 rounded-lg p-8'>
-              <Users className='w-12 h-12 text-green-400 mx-auto mb-4' />
-              <h3 className='text-xl font-semibold text-white mb-4'>
-                Non-Custodial
+            <div className='bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6 lg:p-8 hover:border-secondary/30 transition-all duration-300 hover-lift animate-fade-in md:col-span-2 lg:col-span-1'>
+              <Users className='w-10 sm:w-12 h-10 sm:h-12 text-secondary mx-auto mb-4' />
+              <h3 className='text-lg sm:text-xl font-semibold text-white mb-4'>
+                🔒 Non-Custodial
               </h3>
-              <p className='text-gray-300'>
+              <p className='text-sm sm:text-base text-gray-300'>
                 You always maintain control of your keys and funds - Grove never
                 has custody
               </p>
@@ -580,23 +656,23 @@ export default function Home() {
       </section>
 
       {/* CTA Section */}
-      <section className='px-4 lg:px-8 py-16 text-center'>
-        <div className='max-w-4xl mx-auto'>
-          <h2 className='text-4xl lg:text-5xl font-bold mb-6 text-white'>
-            Start growing wealth together
+      <section className='px-4 lg:px-8 py-12 lg:py-16 text-center'>
+        <div className='max-w-4xl mx-auto animate-fade-in'>
+          <h2 className='text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 lg:mb-6 text-white animate-slide-up'>
+            🌱 Start growing wealth together
           </h2>
-          <p className='text-xl text-gray-300 mb-8'>
+          <p className='text-lg sm:text-xl text-gray-300 mb-6 lg:mb-8 animate-slide-up'>
             Create your first savings circle in minutes and discover the power
             of collaborative Bitcoin savings on Citrea.
           </p>
           <Link href='/create'>
-            <Button className='bg-orange-500 hover:bg-orange-600 text-white text-lg px-8 py-4 mb-12'>
-              Create Your Circle
+            <Button className='bg-primary hover:bg-primary/90 text-white text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 mb-8 lg:mb-12 shadow-lg shadow-primary/25 transition-all duration-300 hover-lift animate-glow'>
+              🌳 Create Your Circle
             </Button>
           </Link>
 
           <div className='relative'>
-            <div className='w-64 h-32 mx-auto bg-gradient-to-r from-orange-400 via-green-500 to-orange-600 rounded-lg relative overflow-hidden'>
+            <div className='w-64 h-32 mx-auto bg-gradient-to-r from-primary via-secondary to-primary rounded-lg relative overflow-hidden shadow-lg shadow-primary/20'>
               <div className='absolute inset-0 bg-black bg-opacity-20'></div>
               <div className='absolute inset-0 flex items-center justify-center'>
                 <span className='text-4xl'>🌳</span>
@@ -611,49 +687,61 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className='px-4 lg:px-8 py-16 border-t border-gray-800'>
+      <footer className='px-4 lg:px-8 py-12 lg:py-16 border-t border-white/10'>
         <div className='max-w-7xl mx-auto'>
-          <div className='grid grid-cols-2 lg:grid-cols-4 gap-8 mb-12'>
-            <div>
+          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8 lg:mb-12'>
+            <div className='sm:col-span-2 lg:col-span-1'>
               <h3 className='font-bold text-white mb-4'>🌳 Grove</h3>
               <p className='text-gray-400 text-sm mb-4'>
                 Growing wealth together on Bitcoin
               </p>
               <div className='flex space-x-4'>
-                <div className='w-8 h-8 bg-gray-700 rounded flex items-center justify-center'>
+                <div className='w-8 h-8 bg-white/10 hover:bg-primary/20 rounded flex items-center justify-center transition-colors'>
                   <span className='text-sm'>𝕏</span>
                 </div>
-                <div className='w-8 h-8 bg-gray-700 rounded flex items-center justify-center'>
+                <div className='w-8 h-8 bg-white/10 hover:bg-grove-trust/20 rounded flex items-center justify-center transition-colors'>
                   <span className='text-sm'>TG</span>
                 </div>
-                <div className='w-8 h-8 bg-gray-700 rounded flex items-center justify-center'>
+                <div className='w-8 h-8 bg-white/10 hover:bg-grove-premium/20 rounded flex items-center justify-center transition-colors'>
                   <span className='text-sm'>DC</span>
                 </div>
-                <div className='w-8 h-8 bg-gray-700 rounded flex items-center justify-center'>
+                <div className='w-8 h-8 bg-white/10 hover:bg-secondary/20 rounded flex items-center justify-center transition-colors'>
                   <span className='text-sm'>GH</span>
                 </div>
               </div>
             </div>
             <div>
               <h4 className='font-semibold text-white mb-4'>Platform</h4>
-              <ul className='space-y-2 text-gray-400'>
+              <ul className='space-y-2 text-gray-400 text-sm'>
                 <li>
-                  <Link href='#' className='hover:text-white'>
+                  <Link
+                    href='#'
+                    className='hover:text-primary transition-colors'
+                  >
                     Savings Circles
                   </Link>
                 </li>
                 <li>
-                  <Link href='#' className='hover:text-white'>
+                  <Link
+                    href='#'
+                    className='hover:text-accent transition-colors'
+                  >
                     Achievements
                   </Link>
                 </li>
                 <li>
-                  <Link href='#' className='hover:text-white'>
+                  <Link
+                    href='#'
+                    className='hover:text-secondary transition-colors'
+                  >
                     Inheritance
                   </Link>
                 </li>
                 <li>
-                  <Link href='#' className='hover:text-white'>
+                  <Link
+                    href='#'
+                    className='hover:text-grove-trust transition-colors'
+                  >
                     Leaderboards
                   </Link>
                 </li>
@@ -661,24 +749,36 @@ export default function Home() {
             </div>
             <div>
               <h4 className='font-semibold text-white mb-4'>Technology</h4>
-              <ul className='space-y-2 text-gray-400'>
+              <ul className='space-y-2 text-gray-400 text-sm'>
                 <li>
-                  <Link href='#' className='hover:text-white'>
+                  <Link
+                    href='#'
+                    className='hover:text-primary transition-colors'
+                  >
                     Citrea Integration
                   </Link>
                 </li>
                 <li>
-                  <Link href='#' className='hover:text-white'>
+                  <Link
+                    href='#'
+                    className='hover:text-grove-trust transition-colors'
+                  >
                     Hyperlane Bridge
                   </Link>
                 </li>
                 <li>
-                  <Link href='#' className='hover:text-white'>
+                  <Link
+                    href='#'
+                    className='hover:text-accent transition-colors'
+                  >
                     ZK-Proofs
                   </Link>
                 </li>
                 <li>
-                  <Link href='#' className='hover:text-white'>
+                  <Link
+                    href='#'
+                    className='hover:text-secondary transition-colors'
+                  >
                     Smart Contracts
                   </Link>
                 </li>
@@ -686,24 +786,30 @@ export default function Home() {
             </div>
             <div>
               <h4 className='font-semibold text-white mb-4'>Community</h4>
-              <ul className='space-y-2 text-gray-400'>
+              <ul className='space-y-2 text-gray-400 text-sm'>
                 <li>
-                  <Link href='#' className='hover:text-white'>
+                  <Link href='#' className='hover:text-white transition-colors'>
                     Documentation
                   </Link>
                 </li>
                 <li>
-                  <Link href='#' className='hover:text-white'>
+                  <Link
+                    href='#'
+                    className='hover:text-grove-premium transition-colors'
+                  >
                     Discord
                   </Link>
                 </li>
                 <li>
-                  <Link href='#' className='hover:text-white'>
+                  <Link
+                    href='#'
+                    className='hover:text-grove-trust transition-colors'
+                  >
                     Telegram
                   </Link>
                 </li>
                 <li>
-                  <Link href='#' className='hover:text-white'>
+                  <Link href='#' className='hover:text-white transition-colors'>
                     Blog
                   </Link>
                 </li>
@@ -711,28 +817,28 @@ export default function Home() {
             </div>
           </div>
 
-          <div className='flex flex-col lg:flex-row justify-between items-center pt-8 border-t border-gray-800'>
+          <div className='flex flex-col lg:flex-row justify-between items-center pt-8 border-t border-white/10'>
             <div className='flex space-x-6 text-gray-400 text-sm mb-4 lg:mb-0'>
-              <Link href='#' className='hover:text-white'>
+              <Link href='#' className='hover:text-white transition-colors'>
                 Privacy Policy
               </Link>
-              <Link href='#' className='hover:text-white'>
+              <Link href='#' className='hover:text-white transition-colors'>
                 Terms of Service
               </Link>
-              <Link href='#' className='hover:text-white'>
+              <Link href='#' className='hover:text-white transition-colors'>
                 Security
               </Link>
-              <Link href='#' className='hover:text-white'>
+              <Link href='#' className='hover:text-white transition-colors'>
                 Bug Bounty
               </Link>
             </div>
             <div className='flex items-center space-x-4'>
               <div className='text-gray-400 text-sm'>Powered by</div>
               <div className='flex space-x-2'>
-                <div className='px-2 py-1 bg-gray-700 rounded text-xs text-gray-300'>
+                <div className='px-2 py-1 bg-primary/20 rounded text-xs text-primary border border-primary/30'>
                   Citrea
                 </div>
-                <div className='px-2 py-1 bg-gray-700 rounded text-xs text-gray-300'>
+                <div className='px-2 py-1 bg-grove-trust/20 rounded text-xs text-grove-trust border border-grove-trust/30'>
                   Dynamic
                 </div>
               </div>

@@ -43,3 +43,13 @@ DYNAMIC_INTEGRATION.md
 misc
 .env
 .env-local
+
+achievement-images.ts
+deployment-safe-guide.js
+gamification-complete.js
+
+priority-1-testing.js
+PRIORITY-1-TESTING.md
+setup-achievements.js
+src/app/api/debug
+src/app/debug-messaging

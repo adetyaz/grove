@@ -10,28 +10,3 @@ export async function getOrCreateUser(email: string, wallet: string) {
     update: { wallet },
   });
 }
-
-// Create a new circle (stores both on-chain and off-chain)
-export async function createCircle(
-  name: string,
-  paymentType: string,
-  amount: number,
-  ownerEmail: string,
-  ownerWallet: string,
-  onChainId: number
-) {
-  return prisma.circle.create({
-    data: {
-      name,
-      paymentType,
-      amount,
-      onChainId,
-      owner: {
-        connectOrCreate: {
-          where: { email: ownerEmail },
-          create: { email: ownerEmail, wallet: ownerWallet },
-        },
-      },
-    },
-  });
-}

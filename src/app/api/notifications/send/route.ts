@@ -177,8 +177,8 @@ export async function POST(request: NextRequest) {
           inviterEmail: invitationData.inviterEmail,
           inviterAddress: invitationData.inviterAddress,
           recipientEmail: invitationData.recipientEmail,
-          recipientTelegram: invitationData.recipientTelegram,
-          recipientWhatsApp: invitationData.recipientWhatsApp,
+          // recipientTelegram: invitationData.recipientTelegram, // Commented out for app focus
+          // recipientWhatsApp: invitationData.recipientWhatsApp, // Commented out for app focus
           circleDescription: circle.description || undefined,
           inviteLink: invitationData.inviteLink, // Pass the correct invite link from frontend
         });

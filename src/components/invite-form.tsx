@@ -12,7 +12,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mail, MessageCircle, Phone, Send } from "lucide-react";
+import { Mail, Send } from "lucide-react";
+// Commented out for app focus: MessageCircle, Phone
 import { useInvitations } from "@/hooks/useInvitations";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { groveToast } from "@/lib/toast";
@@ -38,8 +39,8 @@ export default function InviteForm({
 
   // Form state
   const [email, setEmail] = useState("");
-  const [telegram, setTelegram] = useState("");
-  const [whatsapp, setWhatsapp] = useState("");
+  // const [telegram, setTelegram] = useState("");
+  // const [whatsapp, setWhatsapp] = useState("");
   const [personalMessage, setPersonalMessage] = useState("");
   const [activeTab, setActiveTab] = useState("email");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,8 +48,8 @@ export default function InviteForm({
   // Service availability
   const [serviceStatus, setServiceStatus] = useState({
     email: false,
-    telegram: false,
-    whatsapp: false,
+    // telegram: false,
+    // whatsapp: false,
   });
 
   // Test notification services on component mount
@@ -59,7 +60,7 @@ export default function InviteForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email && !telegram && !whatsapp) {
+    if (!email /* && !telegram && !whatsapp */) {
       groveToast.error("Please provide at least one contact method");
       return;
     }
@@ -87,8 +88,8 @@ export default function InviteForm({
       const invitationData = {
         circleId, // Ensure the backend and InvitationData type support this
         recipientEmail: email,
-        recipientTelegram: telegram || undefined,
-        recipientWhatsApp: whatsapp || undefined,
+        // recipientTelegram: telegram || undefined,
+        // recipientWhatsApp: whatsapp || undefined,
         circleName,
         circleDescription: circleDescription || personalMessage || undefined,
       };
@@ -111,8 +112,8 @@ export default function InviteForm({
 
       // Reset form
       setEmail("");
-      setTelegram("");
-      setWhatsapp("");
+      // setTelegram("");
+      // setWhatsapp("");
       setPersonalMessage("");
 
       onSuccess?.();
@@ -143,10 +144,10 @@ export default function InviteForm({
               onValueChange={setActiveTab}
               className='w-full'
             >
-              <TabsList className='grid w-full grid-cols-3 bg-white/10'>
+              <TabsList className='grid w-full grid-cols-1 bg-white/10'>
                 <TabsTrigger
                   value='email'
-                  className='data-[state=active]:bg-green-500 data-[state=active]:text-white'
+                  className='text-black data-[state=active]:bg-green-500 data-[state=active]:text-white hover:text-white hover:bg-white/20'
                 >
                   <Mail className='w-4 h-4 mr-2' />
                   Email
@@ -154,6 +155,7 @@ export default function InviteForm({
                     <div className='w-2 h-2 bg-green-400 rounded-full ml-2' />
                   )}
                 </TabsTrigger>
+                {/* Telegram and WhatsApp tabs commented out to focus on app functionality
                 <TabsTrigger
                   value='telegram'
                   className='data-[state=active]:bg-blue-500 data-[state=active]:text-white'
@@ -174,6 +176,7 @@ export default function InviteForm({
                     <div className='w-2 h-2 bg-green-400 rounded-full ml-2' />
                   )}
                 </TabsTrigger>
+                */}
               </TabsList>
 
               <TabsContent value='email' className='space-y-4'>
@@ -193,6 +196,7 @@ export default function InviteForm({
                 </div>
               </TabsContent>
 
+              {/* Telegram and WhatsApp tab content commented out
               <TabsContent value='telegram' className='space-y-4'>
                 <div>
                   <Label htmlFor='telegram' className='text-gray-300'>
@@ -232,6 +236,7 @@ export default function InviteForm({
                   </p>
                 </div>
               </TabsContent>
+              */}
             </Tabs>
 
             {/* Personal Message */}
@@ -248,7 +253,7 @@ export default function InviteForm({
               />
             </div>
 
-            {/* Multi-channel selector */}
+            {/* Multi-channel selector - Commented out to focus on app functionality
             <div className='bg-white/5 p-4 rounded-lg border border-white/10'>
               <h4 className='font-medium mb-3 text-gray-200'>
                 Send via multiple channels:
@@ -286,6 +291,7 @@ export default function InviteForm({
                 </label>
               </div>
             </div>
+            */}
 
             {/* Action buttons */}
             <div className='flex space-x-4'>
@@ -303,7 +309,7 @@ export default function InviteForm({
                 disabled={
                   isLoading ||
                   isSubmitting ||
-                  (!email && !telegram && !whatsapp)
+                  !email /* && !telegram && !whatsapp */
                 }
                 className='flex-1 bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700'
               >

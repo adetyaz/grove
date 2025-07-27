@@ -265,20 +265,20 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
     <div className='space-y-6'>
       {/* Network Check */}
       {isConnected && !isOnCorrectNetwork && (
-        <div className='bg-orange-500/20 border border-orange-500/30 rounded-lg p-4'>
+        <div className='bg-primary/20 border border-primary/30 rounded-lg p-4 animate-fade-in'>
           <div className='flex items-center justify-between'>
             <div>
-              <h3 className='text-sm font-medium text-orange-200'>
+              <h3 className='text-sm font-medium text-primary'>
                 Switch to Citrea Testnet
               </h3>
-              <p className='text-xs text-orange-300 mt-1'>
+              <p className='text-xs text-gray-300 mt-1'>
                 Grove circles are created on Citrea testnet. Please switch your
                 network to continue.
               </p>
             </div>
             <button
               onClick={() => switchChain({ chainId: CITREA_TESTNET.id })}
-              className='px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white text-sm rounded transition-colors'
+              className='px-3 py-1 bg-primary hover:bg-primary/90 text-white text-sm rounded transition-all duration-300 hover-lift'
             >
               Switch Network
             </button>
@@ -297,7 +297,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
             value={formData.name}
             onChange={handleInputChange}
             placeholder='Family Emergency Fund'
-            className='w-full p-4 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-white placeholder-gray-400 backdrop-blur-sm'
+            className='w-full p-4 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300'
             required
           />
         </div>
@@ -312,7 +312,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
             onChange={handleInputChange}
             placeholder='Describe the purpose of this savings circle...'
             rows={3}
-            className='w-full p-4 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-white placeholder-gray-400 backdrop-blur-sm resize-none'
+            className='w-full p-4 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white placeholder-gray-400 backdrop-blur-sm resize-none transition-all duration-300'
           />
         </div>
 
@@ -329,7 +329,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
               placeholder='0.1'
               step='0.001'
               min='0'
-              className='w-full p-4 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-white placeholder-gray-400 backdrop-blur-sm'
+              className='w-full p-4 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300'
               required
             />
           </div>
@@ -342,7 +342,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
               name='paymentType'
               value={formData.paymentType}
               onChange={handleInputChange}
-              className='w-full p-4 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-white backdrop-blur-sm'
+              className='w-full p-4 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white backdrop-blur-sm transition-all duration-300'
             >
               <option
                 value={PaymentType.OneTime}
@@ -361,8 +361,8 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
         </div>
 
         {formData.paymentType === PaymentType.Recurring && (
-          <div className='bg-orange-500/20 rounded-lg p-4 border border-orange-500/30'>
-            <label className='block text-sm font-medium text-orange-200 mb-2'>
+          <div className='bg-secondary/20 rounded-lg p-4 border border-secondary/30 animate-fade-in'>
+            <label className='block text-sm font-medium text-secondary mb-2'>
               Monthly Contribution Amount (BTC) *
             </label>
             <input
@@ -373,10 +373,10 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
               placeholder='0.01'
               step='0.001'
               min='0'
-              className='w-full p-4 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-white placeholder-gray-400 backdrop-blur-sm'
+              className='w-full p-4 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-secondary focus:border-secondary text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300'
               required
             />
-            <p className='text-xs text-orange-200 mt-2 flex items-center'>
+            <p className='text-xs text-gray-300 mt-2 flex items-center'>
               <span className='mr-1'>🔄</span>
               This amount will be contributed monthly by each member
             </p>
@@ -392,15 +392,15 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
             name='deadline'
             value={formData.deadline}
             onChange={handleInputChange}
-            className='w-full p-4 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-white backdrop-blur-sm'
+            className='w-full p-4 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white backdrop-blur-sm transition-all duration-300'
             required
           />
         </div>
 
         {/* Transaction Status */}
         {isPending && (
-          <div className='bg-blue-500/20 border border-blue-500/30 rounded-lg p-4'>
-            <p className='text-blue-200 text-sm'>
+          <div className='bg-trust/20 border border-trust/30 rounded-lg p-4 animate-fade-in'>
+            <p className='text-trust text-sm'>
               <strong>Transaction Pending:</strong> Please confirm the
               transaction in your wallet...
             </p>
@@ -408,8 +408,8 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
         )}
 
         {isConfirming && (
-          <div className='bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-4'>
-            <p className='text-yellow-200 text-sm'>
+          <div className='bg-accent/20 border border-accent/30 rounded-lg p-4 animate-fade-in'>
+            <p className='text-accent text-sm'>
               <strong>Confirming:</strong> Waiting for blockchain
               confirmation...
               {hash && (
@@ -422,8 +422,8 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
         )}
 
         {isNavigating && (
-          <div className='bg-blue-500/20 border border-blue-500/30 rounded-lg p-4'>
-            <p className='text-blue-200 text-sm'>
+          <div className='bg-trust/20 border border-trust/30 rounded-lg p-4 animate-fade-in'>
+            <p className='text-trust text-sm'>
               <strong>Success:</strong> Circle created! Redirecting to
               dashboard...
             </p>
@@ -432,7 +432,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
 
         {/* Error Messages */}
         {writeError && (
-          <div className='bg-red-500/20 border border-red-500/30 rounded-lg p-4'>
+          <div className='bg-red-500/20 border border-red-500/30 rounded-lg p-4 animate-fade-in'>
             <p className='text-red-200 text-sm'>
               <strong>Error:</strong> {writeError?.message}
             </p>
@@ -441,8 +441,8 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
 
         {/* Success Message */}
         {isConfirmed && (
-          <div className='bg-green-500/20 border border-green-500/30 rounded-lg p-4'>
-            <p className='text-green-200 text-sm'>
+          <div className='bg-secondary/20 border border-secondary/30 rounded-lg p-4 animate-fade-in'>
+            <p className='text-secondary text-sm'>
               <strong>Success!</strong> Your circle has been created
               successfully!
               {hash && (
@@ -469,7 +469,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
             (formData.paymentType === PaymentType.Recurring &&
               !formData.fixedAmount)
           }
-          className='w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-4 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-200 transform hover:scale-[1.02] disabled:hover:scale-100 shadow-lg'
+          className='w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-white py-4 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-300 hover-lift disabled:hover:scale-100 shadow-lg hover:shadow-primary/25'
         >
           {isCreating ? (
             <div className='flex items-center justify-center'>
@@ -500,7 +500,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
         </button>
 
         {!isConnected && (
-          <div className='text-center p-4 bg-red-500/20 rounded-lg border border-red-500/30'>
+          <div className='text-center p-4 bg-red-500/20 rounded-lg border border-red-500/30 animate-fade-in'>
             <p className='text-sm text-red-200'>
               ⚠️ Please connect your wallet to create a circle
             </p>

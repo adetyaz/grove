@@ -5,7 +5,9 @@ export const GROVE_CONTRACT_ADDRESS =
 export const GIFTENGINE_CONTRACT_ADDRESS =
   "0x63c49617df7211cab09418978a63c9d010189d2c";
 export const ACHIEVEMENTNFT_CONTRACT_ADDRESS =
-  "0x7033d1dadf5cbe03c63be515af72916918bb5863";
+  "0x785453Ec2bbbe87b5E5D19f91c810Be0D4704A14";
+export const GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS =
+  "0x301aC5745348Ffb28120c83Cc2927bCa8169b983";
 export const INHERITANCEMODULE_CONTRACT_ADDRESS =
   "0x70a84d0910584e77dc7f42ea2fe99f4a0a5cc028";
 
@@ -13,6 +15,7 @@ import SATVAULT_ABI from "@/contracts/ABIs/SatVault.json";
 import GROVE_ABI from "@/contracts/ABIs/Grove.json";
 import GIFTENGINE_ABI from "@/contracts/ABIs/GiftEngine.json";
 import ACHIEVEMENTNFT_ABI from "@/contracts/ABIs/AchievementNFT.json";
+import GROVE_ACHIEVEMENTS_ABI from "@/contracts/ABIs/GroveAchievements.json";
 import INHERITANCEMODULE_ABI from "@/contracts/ABIs/InheritanceModule.json";
 
 export {
@@ -20,6 +23,7 @@ export {
   GROVE_ABI,
   GIFTENGINE_ABI,
   ACHIEVEMENTNFT_ABI,
+  GROVE_ACHIEVEMENTS_ABI,
   INHERITANCEMODULE_ABI,
 };
 import { type Address } from "viem";
