@@ -1,110 +1,103 @@
 // Phase 3: Leaderboard API
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import {
-  GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
-  GROVE_ACHIEVEMENTS_ABI,
-} from "@/contracts/constants";
-import { createPublicClient, http } from "viem";
-import { CITREA_TESTNET } from "@/contracts/constants";
-
-// Create viem client for blockchain data
-const publicClient = createPublicClient({
-  chain: CITREA_TESTNET,
-  transport: http(),
-});
 
 export async function GET() {
   try {
-    // Get all users with streak and activity data
-    const users = await prisma.user.findMany({
-      select: {
-        wallet: true,
-        currentStreak: true,
-        longestStreak: true,
-        totalContributions: true,
-        totalSaved: true,
-      },
+    // Get all users who have made contributions from UserActivity
+    const contributionActivities = await prisma.userActivity.findMany({
       where: {
-        totalContributions: { gt: 0 },
+        type: "contribution",
+      },
+      select: {
+        userAddress: true,
+        metadata: true,
       },
     });
 
-    // Get blockchain achievement data for each user
-    const usersWithAchievements = await Promise.all(
-      users.map(async (user) => {
+    // Group by user address and calculate totals
+    const userContributions = new Map<string, bigint>();
+
+    for (const activity of contributionActivities) {
+      const userAddress = activity.userAddress.toLowerCase();
+
+      if (activity.metadata) {
         try {
-          // Get user stats from GroveAchievements contract
-          const stats = await publicClient.readContract({
-            address: GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
-            abi: GROVE_ACHIEVEMENTS_ABI,
-            functionName: "getUserStats",
-            args: [user.wallet as `0x${string}`],
+          const metadata = JSON.parse(activity.metadata);
+          const amount = metadata.amount || "0";
+
+          // Handle both decimal strings and satoshi strings
+          let satoshis = BigInt(0);
+          if (typeof amount === "string") {
+            if (amount.includes(".")) {
+              // Convert decimal to satoshis
+              const numAmount = parseFloat(amount);
+              satoshis = BigInt(Math.floor(numAmount * 100000000));
+            } else {
+              // Already in satoshis
+              satoshis = BigInt(amount);
+            }
+          } else if (typeof amount === "number") {
+            // Convert from BTC to satoshis
+            satoshis = BigInt(Math.floor(amount * 100000000));
+          }
+
+          const currentTotal = userContributions.get(userAddress) || BigInt(0);
+          userContributions.set(userAddress, currentTotal + satoshis);
+        } catch (error) {
+          console.warn("Error parsing activity metadata:", error);
+        }
+      }
+    }
+
+    // Get user details for each contributor
+    const contributors = await Promise.all(
+      Array.from(userContributions.entries()).map(
+        async ([address, totalContributed]) => {
+          const user = await prisma.user.findUnique({
+            where: { wallet: address },
+            include: {
+              ownedCircles: true,
+              memberCircles: true,
+            },
           });
 
-          const [totalContributed, circleCount, achievements] = stats as [
-            bigint,
-            bigint,
-            bigint[]
-          ];
+          const circlesCount = user
+            ? user.ownedCircles.length + user.memberCircles.length
+            : 0;
 
           return {
-            address: user.wallet,
+            address,
+            name: user?.name || null,
             totalContributed: totalContributed.toString(),
-            circleCount: Number(circleCount),
-            achievements: achievements.map((a) => Number(a)),
-            currentStreak: user.currentStreak,
-            longestStreak: user.longestStreak,
-            totalContributions: user.totalContributions,
-            rank: 0, // Will be calculated
-          };
-        } catch (error) {
-          console.warn(
-            `Error fetching blockchain data for ${user.wallet}:`,
-            error
-          );
-          return {
-            address: user.wallet,
-            totalContributed: user.totalSaved || "0",
-            circleCount: 0,
-            achievements: [],
-            currentStreak: user.currentStreak,
-            longestStreak: user.longestStreak,
-            totalContributions: user.totalContributions,
-            rank: 0,
+            circlesCount,
           };
         }
-      })
+      )
     );
 
-    // Sort and rank users by different criteria
-
-    // Top Contributors (by total BTC contributed)
-    const contributors = [...usersWithAchievements]
-      .sort((a, b) =>
-        BigInt(b.totalContributed) > BigInt(a.totalContributed) ? 1 : -1
-      )
-      .map((user, index) => ({ ...user, rank: index + 1 }));
-
-    // Streak Leaders (by current streak)
-    const streakLeaders = [...usersWithAchievements]
-      .sort((a, b) => b.currentStreak - a.currentStreak)
-      .map((user, index) => ({ ...user, rank: index + 1 }));
-
-    // Achievement Leaders (by number of achievements)
-    const achievementLeaders = [...usersWithAchievements]
-      .sort((a, b) => b.achievements.length - a.achievements.length)
-      .map((user, index) => ({ ...user, rank: index + 1 }));
+    // Sort by total contributed (descending) and add ranks
+    const sortedContributors = contributors
+      .filter((contributor) => BigInt(contributor.totalContributed) > BigInt(0))
+      .sort((a, b) => {
+        const contributionDiff = Number(
+          BigInt(b.totalContributed) - BigInt(a.totalContributed)
+        );
+        if (contributionDiff !== 0) return contributionDiff;
+        return b.circlesCount - a.circlesCount;
+      })
+      .map((contributor, index) => ({
+        ...contributor,
+        rank: index + 1,
+      }))
+      .slice(0, 20); // Top 20
 
     return NextResponse.json({
-      contributors: contributors.slice(0, 20), // Top 20
-      streakLeaders: streakLeaders.slice(0, 20),
-      achievementLeaders: achievementLeaders.slice(0, 20),
-      totalUsers: usersWithAchievements.length,
-      lastUpdated: new Date().toISOString(),
+      contributors: sortedContributors,
+      totalContributors: contributors.length,
     });
   } catch (error) {
-    console.error("Error generating leaderboard:", error);
+    console.error("Error fetching leaderboard:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

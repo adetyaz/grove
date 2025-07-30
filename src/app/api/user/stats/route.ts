@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       include: {
         ownedCircles: true,
         memberCircles: true,
-      }
+      },
     });
 
     if (!user) {
@@ -33,31 +33,68 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Since contribution tracking isn't fully implemented in the database yet,
-    // we'll return calculated values based on available data
+   
+    const contributionActivities = await prisma.userActivity.findMany({
+      where: {
+        userAddress: address.toLowerCase(),
+        type: "contribution",
+      },
+      select: {
+        metadata: true,
+      },
+    });
+
+   
+    let totalContributed = BigInt(0);
+    for (const activity of contributionActivities) {
+      if (activity.metadata) {
+        try {
+          const metadata = JSON.parse(activity.metadata);
+          const amount = metadata.amount || "0";
+          
+          
+          let satoshis = BigInt(0);
+          if (typeof amount === "string") {
+            if (amount.includes(".")) {
+              
+              const numAmount = parseFloat(amount);
+              satoshis = BigInt(Math.floor(numAmount * 100000000));
+            } else {
+              
+              satoshis = BigInt(amount);
+            }
+          } else if (typeof amount === "number") {
+         
+            satoshis = BigInt(Math.floor(amount * 100000000));
+          }
+          
+          totalContributed += satoshis;
+        } catch (error) {
+          console.warn("Error parsing activity metadata:", error);
+        }
+      }
+    }
+
     const totalCircles = user.ownedCircles.length + user.memberCircles.length;
-    const activeCircles = totalCircles; // Assume all circles are active for now
-    
-    // Calculate streak based on active circles (simplified)
+    const activeCircles = totalCircles;
+
     const currentStreak = Math.min(activeCircles, 7);
 
-    // Count invited members from CircleInvitation table
     const invitedMembers = await prisma.circleInvitation.count({
       where: {
         inviterEmail: user.email,
-        status: "ACCEPTED"
-      }
+        status: "ACCEPTED",
+      },
     });
 
     return NextResponse.json({
-      totalContributed: "0", // Will be calculated from blockchain data
-      totalContributions: 0, // Will be calculated from blockchain data
-      circlesCompleted: 0,   // Will be calculated from circle progress
+      totalContributed: totalContributed.toString(),
+      totalContributions: contributionActivities.length,
+      circlesCompleted: totalCircles, // For now, considering all circles as "completed"
       currentStreak,
       invitedMembers,
       activeCircles,
     });
-
   } catch (error) {
     console.error("Error fetching user stats:", error);
     return NextResponse.json(

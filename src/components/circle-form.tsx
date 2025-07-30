@@ -2,7 +2,6 @@
 import { useAccount, useSwitchChain, useWriteContract } from "wagmi";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import {
-  PaymentType,
   CITREA_TESTNET,
   GROVE_CONTRACT_ADDRESS,
   GROVE_ABI,
@@ -28,7 +27,6 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
     error: writeError,
   } = useWriteContract();
 
-  // Check if user is on the correct network
   const isOnCorrectNetwork = chain?.id === CITREA_TESTNET.id;
 
   const [hash, setHash] = useState<string | undefined>(undefined);
@@ -41,19 +39,18 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
     name: "",
     description: "",
     targetAmount: "",
-    paymentType: PaymentType.OneTime,
+    paymentType: 0,
     fixedAmount: "",
+    frequency: "MONTHLY",
     deadline: "",
   });
 
-  // Handle transaction hash
   useEffect(() => {
     if (hash) {
       groveToast.transactionPending(hash);
     }
   }, [hash]);
 
-  // Handle transaction errors
   useEffect(() => {
     if (writeError) {
       groveToast.error(`Transaction failed: ${writeError.message}`);
@@ -68,7 +65,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: name === "paymentType" ? Number(value) : value,
     }));
   };
 
@@ -83,7 +80,6 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
       return;
     }
 
-    // Set loading state immediately
     setIsCreating(true);
 
     try {
@@ -103,10 +99,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
         groveToast.error("Deadline must be in the future");
         return;
       }
-      if (
-        formData.paymentType === PaymentType.Recurring &&
-        fixedAmountWei <= 0
-      ) {
+      if (formData.paymentType === 1 && fixedAmountWei <= 0) {
         groveToast.error("Recurring amount must be greater than 0");
         return;
       }
@@ -127,6 +120,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
           targetAmount: targetAmountWei.toString(),
           paymentType: formData.paymentType,
           fixedAmount: fixedAmountWei.toString(),
+          frequency: formData.frequency,
           deadline: deadlineTimestamp.toString(),
           ownerWallet: address,
           ownerEmail: user?.email || `${address}@grove.temp`,
@@ -142,16 +136,12 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
 
       groveToast.info("Circle created in database, deploying to blockchain...");
 
-      // Step 2: Create circle on blockchain
-      // Contract parameters
-      const contributionAmount = BigInt(1); // Minimal amount
-      const interval = BigInt(86400); // 1 day
+      const contributionAmount = BigInt(1);
+      const interval = BigInt(86400);
       const goal = targetAmountWei;
 
-      // Clear the creating state since we're now starting blockchain transaction
       setIsCreating(false);
 
-      // Send transaction using wagmi
       const txHash = await writeContractAsync({
         address: GROVE_CONTRACT_ADDRESS,
         abi: GROVE_ABI,
@@ -164,8 +154,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
 
       groveToast.info("Transaction sent, waiting for confirmation...");
 
-      // Step 3: Wait for confirmation and sync with retry logic
-      const maxRetries = 6; // Increased from 3 to 6 for better reliability
+      const maxRetries = 6;
       let retryCount = 0;
 
       const checkTransactionAndSync = async (): Promise<void> => {
@@ -185,13 +174,13 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
               setIsConfirmed(true);
               setIsNavigating(true);
 
-              // Reset form and redirect
               setFormData({
                 name: "",
                 description: "",
                 targetAmount: "",
-                paymentType: PaymentType.OneTime,
+                paymentType: 0,
                 fixedAmount: "",
+                frequency: "MONTHLY",
                 deadline: "",
               });
 
@@ -288,7 +277,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
 
       <div className='grid gap-6'>
         <div>
-          <label className='block text-sm font-medium text-white mb-2'>
+          <label className='block text-sm text-left font-medium text-white mb-2'>
             Circle Name *
           </label>
           <input
@@ -297,13 +286,13 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
             value={formData.name}
             onChange={handleInputChange}
             placeholder='Family Emergency Fund'
-            className='w-full p-4 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300'
+            className='w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300'
             required
           />
         </div>
 
         <div>
-          <label className='block text-sm font-medium text-white mb-2'>
+          <label className='block text-sm text-left font-medium text-white mb-2'>
             Description
           </label>
           <textarea
@@ -329,7 +318,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
               placeholder='0.1'
               step='0.001'
               min='0'
-              className='w-full p-4 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300'
+              className='w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300'
               required
             />
           </div>
@@ -342,49 +331,67 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
               name='paymentType'
               value={formData.paymentType}
               onChange={handleInputChange}
-              className='w-full p-4 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white backdrop-blur-sm transition-all duration-300'
+              className='w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white backdrop-blur-sm transition-all duration-300'
             >
-              <option
-                value={PaymentType.OneTime}
-                className='bg-gray-800 text-white'
-              >
+              <option value={0} className='bg-gray-800 text-white'>
                 One-Time Payment
               </option>
-              <option
-                value={PaymentType.Recurring}
-                className='bg-gray-800 text-white'
-              >
+              <option value={1} className='bg-gray-800 text-white'>
                 Recurring Payments
               </option>
             </select>
           </div>
         </div>
 
-        {formData.paymentType === PaymentType.Recurring && (
-          <div className='bg-secondary/20 rounded-lg p-4 border border-secondary/30 animate-fade-in'>
-            <label className='block text-sm font-medium text-secondary mb-2'>
-              Monthly Contribution Amount (BTC) *
-            </label>
-            <input
-              type='number'
-              name='fixedAmount'
-              value={formData.fixedAmount}
-              onChange={handleInputChange}
-              placeholder='0.01'
-              step='0.001'
-              min='0'
-              className='w-full p-4 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-secondary focus:border-secondary text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300'
-              required
-            />
-            <p className='text-xs text-gray-300 mt-2 flex items-center'>
-              <span className='mr-1'>🔄</span>
-              This amount will be contributed monthly by each member
-            </p>
+        {formData.paymentType === 1 && (
+          <div className='bg-blue-500/20 border-2 border-purple-500 rounded-lg p-6 space-y-4'>
+            <h3 className='text-purple-300 font-bold text-lg'>
+              Recurring Payment Settings
+            </h3>
+
+            <div>
+              <label className='block text-sm font-medium text-white mb-2'>
+                Payment Frequency *
+              </label>
+              <select
+                name='frequency'
+                value={formData.frequency}
+                onChange={handleInputChange}
+                className='w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500'
+                required
+              >
+                <option value='DAILY'>Daily</option>
+                <option value='WEEKLY'>Weekly</option>
+                <option value='MONTHLY'>Monthly</option>
+              </select>
+            </div>
+
+            <div>
+              <label className='block text-sm font-medium text-white mb-2'>
+                Contribution Amount per Payment (BTC) *
+              </label>
+              <input
+                type='number'
+                name='fixedAmount'
+                value={formData.fixedAmount}
+                onChange={handleInputChange}
+                placeholder='0.01'
+                step='0.001'
+                min='0'
+                className='w-full p-4 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500'
+                required
+              />
+              <p className='text-xs text-gray-300 mt-2 flex items-center'>
+                <span className='mr-1'>🔄</span>
+                This amount will be contributed{" "}
+                {formData.frequency.toLowerCase()} by each member
+              </p>
+            </div>
           </div>
         )}
 
         <div>
-          <label className='block text-sm font-medium text-white mb-2'>
+          <label className='block text-sm text-left font-medium text-white mb-2'>
             Goal Deadline *
           </label>
           <input
@@ -392,7 +399,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
             name='deadline'
             value={formData.deadline}
             onChange={handleInputChange}
-            className='w-full p-4 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white backdrop-blur-sm transition-all duration-300'
+            className='w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white backdrop-blur-sm transition-all duration-300'
             required
           />
         </div>
@@ -466,8 +473,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
             !formData.name ||
             !formData.targetAmount ||
             !formData.deadline ||
-            (formData.paymentType === PaymentType.Recurring &&
-              !formData.fixedAmount)
+            (formData.paymentType === 1 && !formData.fixedAmount)
           }
           className='w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-white py-4 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-300 hover-lift disabled:hover:scale-100 shadow-lg hover:shadow-primary/25'
         >

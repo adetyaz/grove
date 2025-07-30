@@ -173,8 +173,8 @@ export default function AchievementsPage() {
               onClick={() => setFilter(key as any)}
               className={`flex items-center space-x-2 ${
                 filter === key
-                  ? "bg-primary hover:bg-primary/90"
-                  : "border-white/20 text-white hover:bg-white/10"
+                  ? "bg-primary hover:bg-primary/90 text-black"
+                  : "border-white/20 text-black hover:bg-white/10"
               }`}
             >
               <Icon className='w-4 h-4' />

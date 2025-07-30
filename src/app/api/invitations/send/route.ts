@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { notificationService } from "@/lib/notifications";
+import { logUserActivity } from "@/lib/activity-logger";
+import { prisma } from "@/lib/db";
 
 export async function POST(request: NextRequest) {
   try {
@@ -105,6 +107,36 @@ export async function POST(request: NextRequest) {
         },
         { status: 500 }
       );
+    }
+
+    // Log the invitation activity
+    try {
+      // Ensure user exists
+      await prisma.user.upsert({
+        where: { wallet: inviterAddress.toLowerCase() },
+        update: { lastActivityDate: new Date() },
+        create: {
+          wallet: inviterAddress.toLowerCase(),
+          email: inviterEmail,
+          name: inviterName,
+          lastActivityDate: new Date(),
+        },
+      });
+
+      // Log the activity
+      await logUserActivity(
+        inviterAddress,
+        "invitation_sent",
+        `Invited ${recipientEmail} to join ${circleName}`,
+        {
+          inviteeEmail: recipientEmail,
+          circleName,
+          circleId,
+        }
+      );
+    } catch (activityError) {
+      console.error("Error logging invitation activity:", activityError);
+      // Don't fail the invitation if activity logging fails
     }
 
     // Return success with notification details

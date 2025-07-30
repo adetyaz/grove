@@ -38,8 +38,9 @@ model Circle {
   name          String
   description   String?
   targetAmount  String   // Stored as string to handle bigint
-  paymentType   String   // "FIXED" or "FLEXIBLE"
+  paymentType   String   // "ONETIME" or "RECURRING"
   fixedAmount   String?  // Stored as string to handle bigint
+  frequency     String?  // "DAILY", "WEEKLY", "MONTHLY" (for recurring circles)
   deadline      DateTime
   transactionHash String?
   owner         User     @relation("CircleOwner", fields: [ownerId], references: [id])
@@ -47,6 +48,7 @@ model Circle {
   members       User[]   @relation("CircleMembers")
   invites       Invite[] // Legacy invites
   invitations   CircleInvitation[] // New invitation system
+  paymentSchedules PaymentSchedule[] // Recurring payment schedules
   onChainId     Int?     @unique // Maps to contract's circleId (unique)
   contractAddress String? // Which Grove contract this circle belongs to
   syncStatus    String   @default("PENDING") // "PENDING", "SYNCED", "FAILED"
@@ -95,4 +97,59 @@ model UserActivity {
   @@index([userAddress])
   @@index([type])
   @@index([timestamp])
+}
+
+model PaymentSchedule {
+  id              String   @id @default(uuid())
+  userAddress     String
+  circleId        String
+  circle          Circle   @relation(fields: [circleId], references: [id])
+  amount          String   // Amount in wei/satoshis as string
+  frequency       String   // "DAILY", "WEEKLY", "MONTHLY"
+  nextPaymentDate DateTime
+  lastPaymentDate DateTime?
+  isActive        Boolean  @default(true)
+  totalPayments   Int      @default(0)
+  maxPayments     Int?     // Optional limit on number of payments
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  payments RecurringPayment[]
+  
+  @@index([userAddress])
+  @@index([circleId])
+  @@index([nextPaymentDate])
+  @@index([isActive])
+}
+
+model RecurringPayment {
+  id                String          @id @default(uuid())
+  scheduleId        String
+  schedule          PaymentSchedule @relation(fields: [scheduleId], references: [id])
+  userAddress       String
+  circleId          String
+  amount            String          // Amount in wei/satoshis as string
+  status            String          // "PENDING", "PROCESSING", "COMPLETED", "FAILED"
+  transactionHash   String?
+  scheduledFor      DateTime        // When this payment was scheduled to execute
+  processedAt       DateTime?       // When the payment was actually processed
+  failureReason     String?
+  retryCount        Int             @default(0)
+  createdAt         DateTime        @default(now())
+  
+  @@index([scheduleId])
+  @@index([userAddress])
+  @@index([status])
+  @@index([scheduledFor])
+}
+
+model StreakData {
+  id                String   @id @default(uuid())
+  userAddress       String   @unique
+  currentStreak     Int      @default(0)
+  longestStreak     Int      @default(0)
+  lastActivityDate  DateTime?
+  streakType        String   @default("CONTRIBUTION") // "CONTRIBUTION", "LOGIN", "ANY"
+  
+  @@index([userAddress])
 }

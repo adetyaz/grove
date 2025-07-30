@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { parseEther } from "viem";
 import { groveToast } from "@/lib/toast";
-import { groveContract } from "@/lib/grove-contract";
+import { giftEngineContract } from "@/lib/giftengine-contract";
 
 interface GiftFormProps {
   circleId: number;
@@ -21,6 +21,7 @@ export default function GiftForm({
 }: GiftFormProps) {
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
+  const [message, setMessage] = useState("");
 
   const { primaryWallet } = useDynamicConnection();
   const address = primaryWallet?.address;
@@ -32,20 +33,39 @@ export default function GiftForm({
           "Please enter a valid amount, recipient, and ensure wallet is connected"
         );
       }
-      // Simulate and send the gift transaction
-      const simulation = await groveContract.simulateGift(
-        { circleId, recipient, amount: parseEther(amount) },
+
+      const giftParams = {
+        circleId,
+        to: recipient as `0x${string}`,
+        amount: parseEther(amount),
+        message: message || "A gift from Grove!",
+      };
+
+      const result = await giftEngineContract.sendGift(
+        giftParams,
         address as `0x${string}`
       );
-      const { request } = simulation;
-      const publicClient = (groveContract as any).publicClient;
-      await publicClient.writeContract(request);
 
-      // Wait for confirmation (simulate delay)
-      await new Promise((resolve) => setTimeout(resolve, 5000));
+      return result;
     },
-    onSuccess: () => {
-      groveToast.success(`Gift of ${amount} BTC sent!`);
+    onSuccess: (result) => {
+      groveToast.success(`Gift of ${amount} BTC sent successfully!`);
+
+      fetch("/api/activity/track-gift", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          senderAddress: address,
+          recipientAddress: recipient,
+          circleId: circleId.toString(),
+          amount,
+          txHash: result.hash,
+          message: message || "A gift from Grove!",
+          circleName,
+        }),
+      }).catch(console.error);
+
+      console.log("Gift sent:", result);
       onSuccess?.();
       onClose?.();
     },
@@ -98,6 +118,19 @@ export default function GiftForm({
               className='w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent'
               placeholder='0.001'
               required
+            />
+          </div>
+          <div>
+            <label className='block text-sm font-medium text-gray-300 mb-2'>
+              Message (Optional)
+            </label>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className='w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none'
+              placeholder='Add a personal message...'
+              rows={3}
+              maxLength={200}
             />
           </div>
           {mutation.isError && (

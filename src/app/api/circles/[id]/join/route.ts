@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { logUserActivity } from "@/lib/activity-logger";
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,6 +57,22 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    // Log circle join activity
+    try {
+      await logUserActivity(
+        memberWallet,
+        "circle_joined",
+        `Joined savings circle "${circle.name}"`,
+        {
+          circleName: circle.name,
+          circleId: circle.id,
+        }
+      );
+    } catch (activityError) {
+      console.error("Error logging circle join activity:", activityError);
+      // Don't fail join if activity logging fails
+    }
 
     // Send member joined notification
     try {

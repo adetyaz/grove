@@ -9,7 +9,7 @@ import WalletButton from "@/components/wallet-button";
 import CircleCard from "@/components/circle-card";
 import CircleSelectionModal from "@/components/circle-selection-modal";
 import Leaderboard from "@/components/leaderboard";
-import RecentActivity from "@/components/recent-activity";
+import StreakLeaderboard from "@/components/streak-leaderboard";
 import EnhancedActivityFeed from "@/components/enhanced-activity-feed";
 import AchievementPanel from "@/components/achievement-panel";
 import { useDashboardData, formatBTCAmount } from "@/hooks/useDashboardData";
@@ -22,7 +22,6 @@ import {
   Wallet,
   ArrowLeft,
   Trophy,
-  Bug,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -314,7 +313,7 @@ export default function DashboardPage() {
                   <Wallet className='w-4 h-4 mr-2' />
                   Make Contribution
                 </Button>
-                <Button
+                {/* <Button
                   variant='outline'
                   className='w-full border-trust text-trust hover:bg-trust hover:text-white transition-all duration-300'
                   onClick={() => {
@@ -330,7 +329,7 @@ export default function DashboardPage() {
                 >
                   <Gift className='w-4 h-4 mr-2' />
                   Send Gift
-                </Button>
+                </Button> */}
                 <Link href='/achievements' className='block'>
                   <Button
                     variant='outline'
@@ -340,15 +339,6 @@ export default function DashboardPage() {
                     View Achievements
                   </Button>
                 </Link>
-                {/* <Link href='/debug-messaging' className='block'>
-                  <Button
-                    variant='outline'
-                    className='w-full border-gray-400 text-gray-400 hover:bg-gray-400 hover:text-white transition-all duration-300'
-                  >
-                    <Bug className='w-4 h-4 mr-2' />
-                    Debug Messaging
-                  </Button>
-                </Link> */}
               </CardContent>
             </Card>
 
@@ -360,6 +350,9 @@ export default function DashboardPage() {
 
             {/* Leaderboard */}
             <Leaderboard userAddress={connectionState.address!} />
+
+            {/* Streak Leaderboard */}
+            <StreakLeaderboard />
 
             {/* Grove Status */}
             <Card className='bg-gradient-to-br from-secondary/20 to-secondary/30 border-secondary/40 animate-fade-in glow'>

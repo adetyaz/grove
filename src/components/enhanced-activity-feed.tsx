@@ -72,9 +72,18 @@ export default function EnhancedActivityFeed({
   const formatActivityDescription = (activity: any) => {
     switch (activity.type) {
       case "contribution":
-        return `Contributed ${formatBTCAmount(
-          BigInt(activity.metadata?.amount || 0)
-        )} to ${activity.metadata?.circleName || "a circle"}`;
+        let amount = activity.metadata?.amount || 0;
+        if (typeof amount === "string") {
+          if (amount.includes(".")) {
+            const numAmount = parseFloat(amount);
+            amount = Math.floor(numAmount * 100000000).toString();
+          }
+        } else if (typeof amount === "number") {
+          amount = Math.floor(amount * 100000000).toString();
+        }
+        return `Contributed ${formatBTCAmount(BigInt(amount))} to ${
+          activity.metadata?.circleName || "a circle"
+        }`;
       case "achievement":
         return `Unlocked "${activity.metadata?.achievementName}" achievement`;
       case "invitation_sent":
@@ -82,9 +91,18 @@ export default function EnhancedActivityFeed({
           activity.metadata?.circleName || "a circle"
         }`;
       case "gift_sent":
-        return `Sent ${formatBTCAmount(
-          BigInt(activity.metadata?.amount || 0)
-        )} gift to ${activity.metadata?.recipient || "someone"}`;
+        let giftAmount = activity.metadata?.amount || 0;
+        if (typeof giftAmount === "string") {
+          if (giftAmount.includes(".")) {
+            const numAmount = parseFloat(giftAmount);
+            giftAmount = Math.floor(numAmount * 100000000).toString();
+          }
+        } else if (typeof giftAmount === "number") {
+          giftAmount = Math.floor(giftAmount * 100000000).toString();
+        }
+        return `Sent ${formatBTCAmount(BigInt(giftAmount))} gift to ${
+          activity.metadata?.recipient || "someone"
+        }`;
       case "circle_created":
         return `Created circle "${activity.metadata?.circleName}"`;
       case "circle_joined":
@@ -146,7 +164,7 @@ export default function EnhancedActivityFeed({
               variant='outline'
               size='sm'
               onClick={() => setShowGlobal(!showGlobal)}
-              className='border-white/20 text-white hover:bg-white/10'
+              className='border-white/20 text-black hover:bg-white/10'
             >
               {showGlobal ? "Your Activity" : "Global Activity"}
             </Button>
@@ -188,7 +206,13 @@ export default function EnhancedActivityFeed({
         </div>
       </CardHeader>
 
-      <CardContent className='space-y-3 max-h-96 overflow-y-auto'>
+      <CardContent
+        className='space-y-3 max-h-96 overflow-y-auto activity-scrollbar'
+        style={{
+          scrollbarWidth: "thin",
+          scrollbarColor: "rgba(255, 255, 255, 0.2) transparent",
+        }}
+      >
         {loading ? (
           <div className='text-center py-8'>
             <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4'></div>
@@ -197,7 +221,7 @@ export default function EnhancedActivityFeed({
         ) : activities.length === 0 ? (
           <div className='text-center py-8'>
             <Clock className='w-12 h-12 text-gray-500 mx-auto mb-4' />
-            <p className='text-gray-400 mb-2'>
+            <p className='text-white mb-2'>
               {showGlobal ? "No global activity yet" : "No activity yet"}
             </p>
             <p className='text-sm text-gray-500'>
@@ -221,8 +245,13 @@ export default function EnhancedActivityFeed({
                     <p className='text-white font-medium text-sm'>
                       {showGlobal && activity.userAddress !== userAddress && (
                         <span className='text-gray-400'>
-                          {activity.userAddress.slice(0, 6)}...
-                          {activity.userAddress.slice(-4)} •{" "}
+                          {activity.user?.email ||
+                            activity.user?.name ||
+                            `${activity.userAddress.slice(
+                              0,
+                              6
+                            )}...${activity.userAddress.slice(-4)}`}{" "}
+                          •{" "}
                         </span>
                       )}
                       {formatActivityDescription(activity)}

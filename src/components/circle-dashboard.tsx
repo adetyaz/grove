@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { UserPlus } from "lucide-react";
 import ContributeForm from "./contribute-form";
+import RecurringPaymentForm from "./recurring-payment-form";
 import InviteForm from "./invite-form";
 import InheritanceForm from "./inheritance-form";
 import InheritanceClaimForm from "./inheritance-claim-form";
@@ -31,7 +32,20 @@ export default function CircleDashboard({
     circleId: string;
     onChainId: number;
     circleName: string;
-  }>({ isOpen: false, circleId: "", onChainId: 0, circleName: "" });
+    paymentType: string;
+  }>({
+    isOpen: false,
+    circleId: "",
+    onChainId: 0,
+    circleName: "",
+    paymentType: "ONETIME",
+  });
+
+  const [recurringModal, setRecurringModal] = useState<{
+    isOpen: boolean;
+    circleId: string;
+    circleName: string;
+  }>({ isOpen: false, circleId: "", circleName: "" });
 
   const [inviteModal, setInviteModal] = useState<{
     isOpen: boolean;
@@ -215,20 +229,36 @@ export default function CircleDashboard({
                   </div>
                 </div>
 
-                <div className='flex space-x-2'>
+                <div className='grid grid-cols-2 gap-2 mb-2'>
                   <button
-                    className='flex-1 bg-gradient-to-r from-green-500/20 to-green-600/20 border border-green-500/30 text-green-300 py-2 px-3 rounded-lg text-sm font-medium hover:from-green-500/30 hover:to-green-600/30 transition-all duration-200'
+                    className='bg-gradient-to-r from-green-500/20 to-green-600/20 border border-green-500/30 text-green-300 py-2 px-3 rounded-lg text-sm font-medium hover:from-green-500/30 hover:to-green-600/30 transition-all duration-200'
                     onClick={() => {
                       setContributeModal({
                         isOpen: true,
                         circleId: circle.id,
                         onChainId: circle.onChainId,
                         circleName: circle.name,
+                        paymentType: circle.paymentType,
                       });
                     }}
                   >
                     Contribute
                   </button>
+                  <button
+                    className='bg-gradient-to-r from-orange-500/20 to-orange-600/20 border border-orange-500/30 text-orange-300 py-2 px-3 rounded-lg text-sm font-medium hover:from-orange-500/30 hover:to-orange-600/30 transition-all duration-200'
+                    onClick={() => {
+                      setRecurringModal({
+                        isOpen: true,
+                        circleId: circle.id,
+                        circleName: circle.name,
+                      });
+                    }}
+                  >
+                    🔄 Auto Pay
+                  </button>
+                </div>
+
+                <div className='flex space-x-2'>
                   <button
                     className='flex-1 bg-gradient-to-r from-blue-500/20 to-blue-600/20 border border-blue-500/30 text-blue-600 py-2 px-3 rounded-lg text-sm font-medium hover:from-blue-500/30 hover:to-blue-600/30 transition-all duration-200'
                     onClick={() => {
@@ -279,6 +309,7 @@ export default function CircleDashboard({
           circleId={contributeModal.circleId}
           onChainId={contributeModal.onChainId}
           circleName={contributeModal.circleName}
+          circlePaymentType={contributeModal.paymentType}
           onSuccess={() => {
             setTimeout(() => {
               setContributeModal({
@@ -286,6 +317,7 @@ export default function CircleDashboard({
                 circleId: "",
                 onChainId: 0,
                 circleName: "",
+                paymentType: "ONETIME",
               });
             }, 1500);
           }}
@@ -296,6 +328,7 @@ export default function CircleDashboard({
               circleId: "",
               onChainId: 0,
               circleName: "",
+              paymentType: "ONETIME",
             })
           }
         />
@@ -346,6 +379,15 @@ export default function CircleDashboard({
               maxAmount: BigInt(0),
               receiver: "",
             })
+          }
+        />
+      )}
+      {recurringModal.isOpen && (
+        <RecurringPaymentForm
+          circleId={recurringModal.circleId}
+          circleName={recurringModal.circleName}
+          onClose={() =>
+            setRecurringModal({ isOpen: false, circleId: "", circleName: "" })
           }
         />
       )}

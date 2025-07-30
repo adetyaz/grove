@@ -6,7 +6,7 @@ import { useAchievements } from "@/hooks/useAchievements";
 import { useStreakTracking } from "@/hooks/useStreakTracking";
 import { parseEther } from "viem";
 import { groveToast } from "@/lib/toast";
-// import { achievementNFTContract } from "@/lib/achievementnft-contract"; // Temporarily disabled
+
 import { useWriteContract, useReadContract } from "wagmi";
 import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/contracts/constants";
 
@@ -14,6 +14,7 @@ interface ContributeFormProps {
   circleId: string;
   onChainId: number;
   circleName: string;
+  circlePaymentType?: string;
   onSuccess?: () => void;
   onClose?: () => void;
   onContributionSuccess?: (
@@ -27,6 +28,7 @@ export default function ContributeForm({
   circleId,
   onChainId,
   circleName,
+  circlePaymentType = "ONETIME",
   onSuccess,
   onClose,
   onContributionSuccess,
@@ -38,54 +40,34 @@ export default function ContributeForm({
   const { primaryWallet, isConnected } = useDynamicConnection();
   const address = primaryWallet?.address;
   const { checkAndAwardAchievements } = useAchievements();
-  const { recordActivity, checkStreakAchievement } = useStreakTracking();
+  const { recordActivity } = useStreakTracking();
+
+  const isRecurringCircle = circlePaymentType === "RECURRING";
 
   const { writeContractAsync } = useWriteContract();
 
-  // Check if user is a member of this circle
   const {
     data: isMember,
-    isLoading: checkingMembership,
+    isLoading: isLoadingMembership,
     refetch: refetchMembership,
   } = useReadContract({
     address: GROVE_CONTRACT_ADDRESS,
     abi: GROVE_ABI,
-    functionName: "isMemberOf",
+    functionName: "isMember",
     args: onChainId && address ? [BigInt(onChainId), address] : undefined,
     query: {
-      enabled: !!(address && onChainId && onChainId > 0),
-      staleTime: 0,
-      refetchOnWindowFocus: true,
-      refetchInterval: 5000,
+      enabled: !!(onChainId && address && onChainId > 0),
+      retry: 3,
+      staleTime: 1000 * 60 * 2,
     },
   });
 
   const mutation = useMutation({
     mutationFn: async () => {
-      // Enhanced connection checks
-      if (!isConnected || !primaryWallet) {
-        throw new Error(
-          "Wallet not connected. Please connect your wallet first."
-        );
+      if (!address || !amount) {
+        throw new Error("Please enter a valid amount and connect your wallet");
       }
 
-      if (!address) {
-        throw new Error(
-          "No wallet address found. Please reconnect your wallet."
-        );
-      }
-
-      if (!amount) {
-        throw new Error("Please enter a valid amount");
-      }
-
-      if (!onChainId || onChainId === 0) {
-        throw new Error(
-          "Circle is not properly synced with blockchain. Please try again later."
-        );
-      }
-
-      // Check if user is a member before contributing
       if (!isMember) {
         throw new Error(
           "You are not a member of this circle. Please join the circle first."
@@ -97,7 +79,6 @@ export default function ContributeForm({
       groveToast.info("Processing contribution...");
 
       try {
-        // Use Grove contract's contribute method with the actual onChainId
         const txHash = await writeContractAsync({
           address: GROVE_CONTRACT_ADDRESS,
           abi: GROVE_ABI,
@@ -109,10 +90,8 @@ export default function ContributeForm({
         setHash(txHash);
         groveToast.transactionPending(txHash);
 
-        // Wait for confirmation (simulate delay)
         await new Promise((resolve) => setTimeout(resolve, 5000));
       } catch (contractError: any) {
-        // Enhanced error handling for connection issues
         const errorMessage =
           contractError?.message ||
           contractError?.toString() ||
@@ -122,104 +101,106 @@ export default function ContributeForm({
           throw new Error(
             "Wallet connection lost. Please reconnect your wallet and try again."
           );
-        } else if (errorMessage.includes("User rejected")) {
-          throw new Error("Transaction was rejected. Please try again.");
-        } else if (errorMessage.includes("insufficient funds")) {
-          throw new Error("Insufficient funds for this transaction.");
-        } else {
-          throw new Error(`Transaction failed: ${errorMessage}`);
         }
-      }
 
-      // === Step 5: Achievement & Milestone Detection ===
-      // Check and award achievements based on contribution using smart contracts
-
-      // Fetch user's contribution history for achievement calculation
-      try {
-        const userStatsResponse = await fetch(
-          `/api/user/stats?address=${address}`
-        );
-        if (userStatsResponse.ok) {
-          const userStats = await userStatsResponse.json();
-
-          // Calculate new totals including this contribution
-          const contributionWei = parseEther(amount);
-          const newTotalContributed =
-            BigInt(userStats.totalContributed || 0) + contributionWei;
-
-          // Check for achievements using smart contract integration
-          await checkAndAwardAchievements({
-            totalContributed: newTotalContributed,
-            circlesCompleted: userStats.circlesCompleted || 0,
-            currentStreak: userStats.currentStreak || 0,
-            invitedMembers: userStats.invitedMembers || 0,
-            isFirstContribution: userStats.totalContributions === 0, // First time contributing
-          });
+        if (errorMessage.includes("User rejected")) {
+          throw new Error("Transaction was cancelled by user.");
         }
-      } catch (error) {
-        console.warn("Could not check achievements:", error);
-        // Don't fail the contribution if achievement checking fails
-      }
 
-      // === Phase 2: Track streak activity ===
-      try {
-        const streakResult = await recordActivity("CONTRIBUTION");
-        if (streakResult?.achievementEarned) {
-          groveToast.achievement(
-            "🔥 Streak Achievement!",
-            "You've earned the Consistency King achievement!"
+        if (errorMessage.includes("insufficient funds")) {
+          throw new Error(
+            "Insufficient funds. Please check your wallet balance and try again."
           );
         }
-      } catch (error) {
-        console.warn("Could not track streak:", error);
-      }
-    },
-    onSuccess: () => {
-      groveToast.contributionMade(`${amount} BTC`);
 
-      // Call the targeted update function to update just this circle's data
+        throw new Error(`Transaction failed: ${errorMessage}`);
+      }
+
+      if (isRecurringCircle) {
+        try {
+          const scheduleResponse = await fetch("/api/payments/schedule", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userAddress: address,
+              circleId: circleId,
+              amount: parseFloat(amount),
+              frequency: "WEEKLY",
+              maxPayments: null,
+            }),
+          });
+
+          const scheduleData = await scheduleResponse.json();
+          if (!scheduleData.success) {
+            console.warn(
+              "Failed to set up recurring schedule:",
+              scheduleData.error
+            );
+          }
+        } catch (scheduleError) {
+          console.warn("Failed to set up recurring schedule:", scheduleError);
+        }
+      }
+
+      setTimeout(() => {
+        setTimeoutReached(true);
+      }, 45000);
+
+      const contributionAmount = parseEther(amount);
+
+      try {
+        await fetch("/api/contribution/log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userAddress: address,
+            circleId,
+            amount,
+            txHash: hash,
+            circleName,
+          }),
+        });
+      } catch (logError) {
+        console.warn("Failed to log contribution:", logError);
+      }
+
+      const achievementStats = {
+        totalContributed: contributionAmount,
+        circlesCompleted: 1,
+        currentStreak: 1,
+        invitedMembers: 0,
+        isFirstContribution: false,
+      };
+
+      await checkAndAwardAchievements(achievementStats);
+      await recordActivity("CONTRIBUTION");
+
       if (onContributionSuccess) {
-        const contributionAmount = parseEther(amount);
-        console.log("🔄 Calling onContributionSuccess with:", {
+        console.log("🎯 Calling onContributionSuccess with:", {
           circleId,
           contributionAmount: contributionAmount.toString(),
         });
         onContributionSuccess(circleId, contributionAmount);
-
-        // Add a small delay then trigger fallback refresh if available
-        setTimeout(() => {
-          if (onRefresh) {
-            console.log("🔄 Triggering fallback refresh...");
-            onRefresh();
-          }
-        }, 500);
-      } else {
-        console.log("⚠️ onContributionSuccess callback not provided");
-        // If no real-time update, definitely trigger refresh
-        if (onRefresh) {
-          setTimeout(() => {
-            console.log(
-              "🔄 No real-time update available, triggering refresh..."
-            );
-            onRefresh();
-          }, 1000);
-        }
       }
 
-      // Force a small delay to ensure the UI updates are visible
+      if (onRefresh) {
+        setTimeout(() => {
+          console.log(
+            "🔄 No real-time update available, triggering refresh..."
+          );
+          onRefresh();
+        }, 1000);
+      }
+
       setTimeout(() => {
         onSuccess?.();
         onClose?.();
-      }, 1000); // Reduced from 2000ms to 1000ms for faster UX
+      }, 1000);
     },
     onError: (err: any) => {
       groveToast.error(`Contribution failed: ${err.message || err.toString()}`);
     },
   });
-
-  // Timeout fallback: close modal after 60s if not confirmed
-  // (react-query mutation will handle most cases, but we keep this for UI feedback)
-  // Optionally, you can add a timer here if needed for extra feedback.
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -253,53 +234,12 @@ export default function ContributeForm({
               onChainId: {onChainId || "null"} • Address: {address?.slice(0, 6)}
               ...{address?.slice(-4)}
             </div>
-            <button
-              className='mt-3 w-full py-2 px-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-colors'
-              onClick={onClose}
-            >
-              Close
-            </button>
-          </div>
-        ) : checkingMembership ? (
-          <div className='bg-trust/20 border border-trust/30 rounded-lg p-4 mb-6'>
-            <p className='text-trust text-sm text-center'>
-              <span className='animate-spin inline-block mr-2'>⏳</span>
-              Checking membership status...
-            </p>
-            <div className='text-xs text-gray-300 mt-2 text-center'>
-              Verifying on Circle ID {onChainId} for {address?.slice(0, 6)}...
-              {address?.slice(-4)}
-            </div>
-          </div>
-        ) : !isMember ? (
-          <div className='bg-red-500/20 border border-red-500/30 rounded-lg p-4 mb-6'>
-            <p className='text-red-200 text-sm text-center mb-3'>
-              <span className='mr-2'>⚠️</span>
-              You are not a member of this circle. This could be due to:
-            </p>
-            <ul className='text-red-200 text-xs mb-3 space-y-1'>
-              <li>• You haven&apos;t joined the circle yet</li>
-              <li>• Your join transaction is still pending</li>
-              <li>
-                • There&apos;s a sync issue between database and blockchain
-              </li>
-            </ul>
-            <div className='text-xs text-red-300 mb-3 text-center bg-red-900/30 rounded p-2'>
-              <strong>Debug Info:</strong>
-              <br />
-              Circle ID: {onChainId} • Address: {address?.slice(0, 6)}...
-              {address?.slice(-4)}
-              <br />
-              Membership Status: {isMember ? "Member" : "Not Member"}
-              <br />
-              UUID: {circleId?.slice(0, 8)}...
-            </div>
-            <div className='flex space-x-2'>
+            <div className='flex space-x-2 mt-3'>
               <button
-                className='flex-1 py-2 px-4 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-colors text-sm'
+                className='flex-1 py-2 px-4 bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-800 transition-colors text-sm'
                 onClick={onClose}
               >
-                Close & Join Circle
+                Close
               </button>
               <button
                 className='flex-1 py-2 px-4 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 transition-colors text-sm'
@@ -380,6 +320,23 @@ export default function ContributeForm({
           </div>
         ) : isMember && onChainId && onChainId > 0 && isConnected && address ? (
           <form onSubmit={handleSubmit} className='space-y-6'>
+            {/* Circle Payment Type Info */}
+            <div className='bg-blue-500/10 border border-blue-500/20 rounded-lg p-4'>
+              <div className='flex items-center space-x-2 mb-2'>
+                <span className='text-lg'>
+                  {isRecurringCircle ? "🔄" : "💰"}
+                </span>
+                <span className='text-blue-300 font-semibold'>
+                  {isRecurringCircle ? "Recurring Circle" : "One-time Circle"}
+                </span>
+              </div>
+              <p className='text-blue-200 text-sm'>
+                {isRecurringCircle
+                  ? "This circle uses recurring payments. You can set up automatic contributions."
+                  : "This circle uses one-time payments. Make individual contributions as needed."}
+              </p>
+            </div>
+
             <div>
               <label className='block text-sm font-medium text-gray-300 mb-2'>
                 Contribution Amount (BTC)
@@ -419,7 +376,11 @@ export default function ContributeForm({
               <button
                 type='submit'
                 disabled={!amount || mutation.isPending}
-                className='flex-1 py-3 px-4 bg-gradient-to-r from-secondary to-secondary/90 hover:from-secondary/90 hover:to-secondary disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-all duration-300 hover-lift shadow-lg hover:shadow-secondary/25'
+                className={`flex-1 py-3 px-4 bg-gradient-to-r ${
+                  isRecurringCircle
+                    ? "from-purple-500 to-purple-700 hover:from-purple-600 hover:to-purple-800"
+                    : "from-secondary to-secondary/90 hover:from-secondary/90 hover:to-secondary"
+                } disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-all duration-300 hover-lift shadow-lg hover:shadow-secondary/25`}
               >
                 {mutation.isPending ? "Contributing..." : "Contribute"}
               </button>
@@ -430,7 +391,7 @@ export default function ContributeForm({
                 <div className='flex items-center space-x-2'>
                   <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-trust'></div>
                   <p className='text-trust text-sm'>
-                    {"Processing contribution..."}
+                    Processing contribution...
                   </p>
                 </div>
               </div>

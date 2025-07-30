@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { NextRequest } from "next/server";
+import { logUserActivity } from "@/lib/activity-logger";
 
 // POST endpoint to store circle data BEFORE on-chain creation
 export async function POST(req: NextRequest) {
@@ -10,6 +11,7 @@ export async function POST(req: NextRequest) {
       targetAmount,
       paymentType,
       fixedAmount,
+      frequency,
       deadline,
       ownerWallet,
       ownerEmail,
@@ -44,6 +46,7 @@ export async function POST(req: NextRequest) {
         targetAmount: targetAmount.toString(),
         paymentType: paymentType === 1 ? "RECURRING" : "ONETIME",
         fixedAmount: fixedAmount ? fixedAmount.toString() : null,
+        frequency: paymentType === 1 ? frequency : null,
         deadline: new Date(Number(deadline) * 1000),
         ownerId: user.id,
         syncStatus: "PENDING",
@@ -54,6 +57,24 @@ export async function POST(req: NextRequest) {
         },
       },
     });
+
+    // Log circle creation activity
+    try {
+      await logUserActivity(
+        ownerWallet,
+        "circle_created",
+        `Created savings circle "${name}"`,
+        {
+          circleName: name,
+          circleId: circle.id,
+          targetAmount: targetAmount.toString(),
+          paymentType: paymentType === 1 ? "RECURRING" : "ONETIME",
+        }
+      );
+    } catch (activityError) {
+      console.error("Error logging circle creation activity:", activityError);
+      // Don't fail circle creation if activity logging fails
+    }
 
     return Response.json({
       success: true,

@@ -6,8 +6,8 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { formatEther } from "viem";
 
 interface Circle {
-  id: string; // Changed to string for UUID
-  onChainId: number; // Contract ID for blockchain calls
+  id: string;
+  onChainId: number;
   name: string;
   description?: string;
   targetAmount: bigint;
@@ -17,6 +17,7 @@ interface Circle {
   memberCount: number;
   members: string[];
   creator: string;
+  paymentType: string;
 }
 
 interface DashboardStats {
@@ -41,7 +42,6 @@ export function useDashboardData() {
   });
   const [loading, setLoading] = useState(false);
 
-  // Get user's circle IDs from blockchain
   const { data: userCircleIds, isLoading: loadingIds } = useReadContract({
     address: GROVE_CONTRACT_ADDRESS,
     abi: GROVE_ABI,
@@ -49,21 +49,18 @@ export function useDashboardData() {
     args: address ? [address] : undefined,
     query: {
       enabled: !!address && isConnected,
-      staleTime: 1000 * 60 * 5, // 5 minutes cache
+      staleTime: 1000 * 60 * 5,
       refetchOnWindowFocus: false,
     },
   });
 
-  // Memoize the fetch function to prevent unnecessary re-renders
   const fetchCircleDetails = useCallback(async () => {
     if (!address) return;
 
     setLoading(true);
     try {
-      // Use AbortController to cancel requests if component unmounts
       const controller = new AbortController();
 
-      // Fetch circles from database first (faster and more reliable)
       const dbResponse = await fetch(`/api/circles?userWallet=${address}`, {
         signal: controller.signal,
       });
@@ -75,9 +72,14 @@ export function useDashboardData() {
       const dbData = await dbResponse.json();
 
       if (dbData.circles && dbData.circles.length > 0) {
-        // Map database circles to our Circle interface
         const dbCircles = await Promise.all(
           dbData.circles.map(async (circle: any) => {
+            console.log("📊 Processing circle from DB:", {
+              name: circle.name,
+              paymentType: circle.paymentType,
+              id: circle.id,
+            });
+
             const targetAmount = BigInt(circle.targetAmount);
             const deadline = BigInt(
               Math.floor(new Date(circle.deadline).getTime() / 1000)
@@ -85,7 +87,6 @@ export function useDashboardData() {
             const memberWallets = circle.members.map((m: any) => m.wallet);
             const allMembers = [circle.owner.wallet, ...memberWallets];
 
-            // Fetch currentAmount from contract if circle is synced
             let currentAmount = BigInt(0);
             try {
               if (circle.onChainId) {
@@ -96,13 +97,11 @@ export function useDashboardData() {
                   currentAmount = onChain.currentAmount;
                 }
               }
-            } catch {
-              // fallback to 0 if contract call fails
-            }
+            } catch {}
 
             return {
-              id: circle.id, // Use UUID as primary ID
-              onChainId: circle.onChainId, // Include contract ID separately
+              id: circle.id,
+              onChainId: circle.onChainId,
               name: circle.name,
               description: circle.description,
               targetAmount,
@@ -112,11 +111,11 @@ export function useDashboardData() {
               memberCount: allMembers.length + circle.invitations.length,
               members: allMembers,
               creator: circle.owner.wallet,
+              paymentType: circle.paymentType,
             };
           })
         );
 
-        // Calculate stats efficiently
         const totalCircles = dbCircles.length;
         const totalSaved = dbCircles.reduce(
           (sum, circle) => sum + circle.currentAmount,
@@ -126,19 +125,14 @@ export function useDashboardData() {
           (circle) => circle.currentAmount >= circle.targetAmount
         ).length;
 
-        // Calculate current streak based on contribution history
         const calculateStreak = (circles: any[]) => {
           if (!circles || circles.length === 0) return 0;
-          
-          // For now, calculate streak based on active circles with recent contributions
-          // In a real implementation, this would check daily contribution patterns
-          const activeCircles = circles.filter(circle => 
-            circle.currentAmount > BigInt(0) && circle.isActive
+
+          const activeCircles = circles.filter(
+            (circle) => circle.currentAmount > BigInt(0) && circle.isActive
           );
-          
-          // Simple streak calculation: number of active circles with contributions
-          // This is a placeholder - real streak would track consecutive days
-          return Math.min(activeCircles.length, 7); // Cap at 7 days
+
+          return Math.min(activeCircles.length, 7);
         };
 
         const currentStreak = calculateStreak(dbCircles);
@@ -151,7 +145,6 @@ export function useDashboardData() {
           circles: dbCircles,
         });
       } else {
-        // Empty state when no circles found
         setDashboardData({
           totalCircles: 0,
           totalSaved: BigInt(0),
@@ -161,12 +154,10 @@ export function useDashboardData() {
         });
       }
     } catch (error) {
-      // Only log errors in development
       if (process.env.NODE_ENV === "development") {
         console.error("Error fetching dashboard data:", error);
       }
 
-      // Set empty state on error
       setDashboardData({
         totalCircles: 0,
         totalSaved: BigInt(0),
@@ -179,14 +170,12 @@ export function useDashboardData() {
     }
   }, [address]);
 
-  // Only re-fetch when address changes or userCircleIds changes
   useEffect(() => {
     if (address) {
       fetchCircleDetails();
     }
   }, [address, userCircleIds, fetchCircleDetails]);
 
-  // Memoized function to update a specific circle after contribution
   const updateCircleContribution = useCallback(
     (circleId: string, contributionAmount: bigint) => {
       console.log("💰 updateCircleContribution called with:", {
@@ -219,7 +208,6 @@ export function useDashboardData() {
           return circle;
         });
 
-        // Recalculate stats with updated data
         const totalSaved = updatedCircles.reduce(
           (sum, circle) => sum + circle.currentAmount,
           BigInt(0)
@@ -244,16 +232,15 @@ export function useDashboardData() {
         return newData;
       });
     },
-    [] // No dependencies needed since we use the prevData pattern
+    []
   );
 
-  // Memoize the return value to prevent unnecessary re-renders
   const memoizedData = useMemo(
     () => ({
       dashboardData,
       loading: loadingIds || loading,
       refresh: fetchCircleDetails,
-      updateCircleContribution, // Add the new function
+      updateCircleContribution,
     }),
     [
       dashboardData,
@@ -267,7 +254,6 @@ export function useDashboardData() {
   return memoizedData;
 }
 
-// Helper functions for formatting
 export const formatBTCAmount = (amount: bigint): string => {
   const eth = formatEther(amount);
   return `₿ ${parseFloat(eth).toFixed(8)}`;

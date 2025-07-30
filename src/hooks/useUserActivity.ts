@@ -23,9 +23,13 @@ export interface UserActivity {
     recipient?: string;
     txHash?: string;
   };
+  user?: {
+    email: string;
+    name?: string;
+    wallet: string;
+  };
 }
 
-// Legacy interface for backward compatibility
 export interface ActivityItem {
   id: string;
   type:
@@ -50,7 +54,6 @@ export function useUserActivity(
 
   const fetchActivities = useCallback(async () => {
     if (!userAddress && filterType === undefined) {
-      // Fetch global activities
       setLoading(true);
       try {
         const params = new URLSearchParams();
@@ -112,7 +115,6 @@ export function useUserActivity(
   };
 }
 
-// Legacy hook for backward compatibility with old components
 export function useUserActivityLegacy(userAddress?: string) {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,7 +132,6 @@ export function useUserActivityLegacy(userAddress?: string) {
         setLoading(true);
         setError(null);
 
-        // For now, return mock data since we don't have the old API endpoint
         const mockActivities: ActivityItem[] = [
           {
             id: "1",
@@ -168,7 +169,7 @@ export function useUserActivityLegacy(userAddress?: string) {
   const refetchActivity = () => {
     if (userAddress) {
       setLoading(true);
-      // Mock refetch for now
+
       setTimeout(() => {
         setLoading(false);
       }, 1000);

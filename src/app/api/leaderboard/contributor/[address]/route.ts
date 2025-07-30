@@ -24,8 +24,41 @@ export async function GET(
       },
     });
 
-    // For now, return basic data since contribution tracking isn't fully implemented
-    // In a real implementation, this would query the blockchain for actual contribution amounts
+    // Calculate total contributions from UserActivity data
+    const contributionActivities = await prisma.userActivity.findMany({
+      where: {
+        userAddress: address.toLowerCase(),
+        type: "contribution",
+      },
+    });
+
+    let totalContributedSatoshis = BigInt(0);
+    for (const activity of contributionActivities) {
+      if (activity.metadata) {
+        try {
+          const metadata = JSON.parse(activity.metadata);
+          const amount = metadata.amount || "0";
+          
+          // Handle both decimal strings and satoshi strings
+          if (typeof amount === 'string') {
+            if (amount.includes('.')) {
+              // Convert decimal to satoshis
+              const numAmount = parseFloat(amount);
+              totalContributedSatoshis += BigInt(Math.floor(numAmount * 100000000));
+            } else {
+              // Already in satoshis
+              totalContributedSatoshis += BigInt(amount);
+            }
+          } else if (typeof amount === 'number') {
+            // Convert from BTC to satoshis
+            totalContributedSatoshis += BigInt(Math.floor(amount * 100000000));
+          }
+        } catch (error) {
+          console.warn('Error parsing activity metadata:', error);
+        }
+      }
+    }
+
     const circlesCount = user
       ? user.ownedCircles.length + user.memberCircles.length
       : 0;
@@ -33,7 +66,7 @@ export async function GET(
     return NextResponse.json({
       address,
       name: user?.name || null,
-      totalContributed: "0", // Would be calculated from blockchain
+      totalContributed: totalContributedSatoshis.toString(),
       circlesCount,
     });
   } catch (error) {

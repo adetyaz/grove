@@ -32,15 +32,37 @@ export async function GET(request: NextRequest) {
       take: 50, // Limit to last 50 activities
     });
 
+    // Manually fetch user data for each activity
+    const activitiesWithUsers = await Promise.all(
+      activities.map(async (activity) => {
+        let user = null;
+        try {
+          user = await prisma.user.findUnique({
+            where: { wallet: activity.userAddress },
+            select: {
+              email: true,
+              name: true,
+              wallet: true,
+            },
+          });
+        } catch (error) {
+          console.log("User not found for address:", activity.userAddress);
+        }
+
+        return {
+          id: activity.id,
+          type: activity.type,
+          userAddress: activity.userAddress,
+          timestamp: activity.timestamp.toISOString(),
+          description: activity.description,
+          metadata: activity.metadata ? JSON.parse(activity.metadata) : null,
+          user,
+        };
+      })
+    );
+
     return NextResponse.json({
-      activities: activities.map((activity) => ({
-        id: activity.id,
-        type: activity.type,
-        userAddress: activity.userAddress,
-        timestamp: activity.timestamp.toISOString(),
-        description: activity.description,
-        metadata: activity.metadata ? JSON.parse(activity.metadata) : null,
-      })),
+      activities: activitiesWithUsers,
     });
   } catch (error) {
     console.error("Error fetching user activities:", error);

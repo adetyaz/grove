@@ -9,7 +9,6 @@ export default function CreateCircle() {
   const { user, primaryWallet } = useDynamicConnection();
   const router = useRouter();
 
-  // Only allow access when we have a confirmed wallet address
   const isConnected = !!(user && primaryWallet?.address);
 
   const handleSuccess = () => {
@@ -31,7 +30,7 @@ export default function CreateCircle() {
               <span className='text-4xl'>🌳</span>
             </div>
           </div>
-          <h1 className='text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6'>
+          <h1 className='text-4xl font-bold text-white mb-6'>
             Plant Your Savings Seed
           </h1>
           <p className='text-lg sm:text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed'>
@@ -48,7 +47,7 @@ export default function CreateCircle() {
               {isConnected ? (
                 <>
                   <div className='mb-6'>
-                    <h2 className='text-2xl sm:text-3xl font-bold text-white mb-2'>
+                    <h2 className='text-2xl font-bold text-white mb-2'>
                       Create Your Circle
                     </h2>
                     <p className='text-gray-300'>
@@ -74,7 +73,7 @@ export default function CreateCircle() {
                   <WalletButton
                     variant='default'
                     size='lg'
-                    className='bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-white mb-6 px-8 py-3 text-lg transition-all duration-300 hover-lift shadow-lg hover:shadow-primary/25'
+                    className='bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-white mb-6 px-8 py-3 text-lg transition-all duration-300 shadow-lg hover:shadow-primary/25'
                   >
                     Connect Wallet to Start
                   </WalletButton>
@@ -91,13 +90,13 @@ export default function CreateCircle() {
           {/* Benefits Section */}
           <div className='order-1 lg:order-2'>
             <div className='bg-white/5 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-white/10 animate-fade-in'>
-              <h3 className='text-2xl sm:text-3xl font-bold text-white mb-6 flex items-center'>
+              <h3 className='text-2xl font-bold text-white mb-6 flex items-center'>
                 <span className='mr-3'>💡</span>
                 How Grove Works
               </h3>
 
               <div className='space-y-6'>
-                <div className='flex items-start space-x-4 transition-all duration-300 hover-lift'>
+                <div className='flex items-start space-x-4 transition-all duration-300'>
                   <div className='w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center flex-shrink-0 mt-1 shadow-lg'>
                     <span className='text-white text-sm font-bold'>1</span>
                   </div>
@@ -112,7 +111,7 @@ export default function CreateCircle() {
                   </div>
                 </div>
 
-                <div className='flex items-start space-x-4 transition-all duration-300 hover-lift'>
+                <div className='flex items-start space-x-4 transition-all duration-300'>
                   <div className='w-8 h-8 bg-gradient-to-br from-secondary to-secondary/80 rounded-full flex items-center justify-center flex-shrink-0 mt-1 shadow-lg'>
                     <span className='text-white text-sm font-bold'>2</span>
                   </div>
@@ -127,7 +126,7 @@ export default function CreateCircle() {
                   </div>
                 </div>
 
-                <div className='flex items-start space-x-4 transition-all duration-300 hover-lift'>
+                <div className='flex items-start space-x-4 transition-all duration-300'>
                   <div className='w-8 h-8 bg-gradient-to-br from-trust to-trust/80 rounded-full flex items-center justify-center flex-shrink-0 mt-1 shadow-lg'>
                     <span className='text-white text-sm font-bold'>3</span>
                   </div>
@@ -142,7 +141,7 @@ export default function CreateCircle() {
                   </div>
                 </div>
 
-                <div className='flex items-start space-x-4 transition-all duration-300 hover-lift'>
+                <div className='flex items-start space-x-4 transition-all duration-300'>
                   <div className='w-8 h-8 bg-gradient-to-br from-accent to-accent/80 rounded-full flex items-center justify-center flex-shrink-0 mt-1 shadow-lg'>
                     <span className='text-white text-sm font-bold'>4</span>
                   </div>

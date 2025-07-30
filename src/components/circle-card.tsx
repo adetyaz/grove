@@ -38,6 +38,7 @@ interface CircleCardProps {
     memberCount: number;
     members: string[];
     creator: string;
+    paymentType?: string;
   };
   userAddress: string;
   onUpdate?: () => void;
@@ -329,6 +330,7 @@ export default function CircleCard({
           circleId={circle.id}
           onChainId={circle.onChainId}
           circleName={circle.name}
+          circlePaymentType={circle.paymentType}
           onClose={() => setShowContributeModal(false)}
           onSuccess={() => {
             setShowContributeModal(false);

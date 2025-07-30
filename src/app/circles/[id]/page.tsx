@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import WalletButton from "@/components/wallet-button";
 import InviteForm from "@/components/invite-form";
 import ContributeForm from "@/components/contribute-form";
 import ContributionHistory from "@/components/contribution-history";
+import GiftForm from "@/components/gift-form";
+import GiftHistory from "@/components/gift-history";
 import { groveToast } from "@/lib/toast";
 import {
   ArrowLeft,
@@ -24,6 +26,7 @@ import {
   TrendingUp,
   DollarSign,
   Award,
+  Gift,
 } from "lucide-react";
 
 interface CircleData {
@@ -39,7 +42,7 @@ interface CircleData {
   memberCount: number;
   members: string[];
   creator: string;
-  paymentType: number;
+  paymentType: string;
   fixedAmount?: bigint;
   createdAt: string;
   contributions?: {
@@ -54,21 +57,29 @@ interface CircleData {
 export default function CircleDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, primaryWallet } = useDynamicConnection();
   const [circle, setCircle] = useState<CircleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showContributeModal, setShowContributeModal] = useState(false);
+  const [showGiftModal, setShowGiftModal] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "members" | "activity"
+    "overview" | "members" | "activity" | "gifts"
   >("overview");
 
   const circleId = params.id as string;
 
-  // Only allow access when we have a confirmed wallet address
   const isConnected = !!(user && primaryWallet?.address);
   const address = primaryWallet?.address;
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "gift" || tab === "gifts") {
+      setActiveTab("gifts");
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!isConnected) {
@@ -115,7 +126,6 @@ export default function CircleDetailPage() {
   };
 
   const formatBTCAmount = (amount: bigint | string) => {
-    // Accepts both string and bigint
     const n = typeof amount === "string" ? BigInt(amount) : amount;
     return `${(Number(n) / 1e18).toFixed(6)} BTC`;
   };
@@ -350,6 +360,15 @@ export default function CircleDetailPage() {
                   Contribute
                 </Button>
                 <Button
+                  onClick={() => setShowGiftModal(true)}
+                  variant='outline'
+                  className='w-full border-pink-500 text-pink-400 hover:bg-pink-500 hover:text-white transition-all duration-300'
+                  disabled={!circle.isActive}
+                >
+                  <Gift className='w-4 h-4 mr-2' />
+                  Send Gift
+                </Button>
+                <Button
                   onClick={() => setShowInviteModal(true)}
                   variant='outline'
                   className='w-full border-trust text-trust hover:bg-trust hover:text-white transition-all duration-300'
@@ -392,11 +411,14 @@ export default function CircleDetailPage() {
               { id: "overview", label: "Overview", icon: Target },
               { id: "members", label: "Members", icon: Users },
               { id: "activity", label: "Activity", icon: TrendingUp },
+              { id: "gifts", label: "Gifts", icon: Gift },
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() =>
-                  setActiveTab(id as "overview" | "members" | "activity")
+                  setActiveTab(
+                    id as "overview" | "members" | "activity" | "gifts"
+                  )
                 }
                 className={`flex items-center space-x-2 px-4 py-2 border-b-2 transition-all duration-300 hover-lift ${
                   activeTab === id
@@ -429,7 +451,9 @@ export default function CircleDetailPage() {
                       <div className='flex justify-between'>
                         <span className='text-gray-400'>Payment Type:</span>
                         <span className='text-white'>
-                          {circle.paymentType === 0 ? "One-time" : "Recurring"}
+                          {circle.paymentType === "RECURRING"
+                            ? "Recurring"
+                            : "One-time"}
                         </span>
                       </div>
                       {circle.fixedAmount && (
@@ -567,6 +591,12 @@ export default function CircleDetailPage() {
               <ContributionHistory />
             </div>
           )}
+
+          {activeTab === "gifts" && (
+            <div className='animate-fade-in'>
+              <GiftHistory circleId={circle.onChainId} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -589,9 +619,23 @@ export default function CircleDetailPage() {
           circleId={circle.id}
           onChainId={circle.onChainId}
           circleName={circle.name}
+          circlePaymentType={circle.paymentType}
           onClose={() => setShowContributeModal(false)}
           onSuccess={() => {
             setShowContributeModal(false);
+            window.location.reload();
+          }}
+        />
+      )}
+
+      {showGiftModal && (
+        <GiftForm
+          circleId={circle.onChainId}
+          circleName={circle.name}
+          onClose={() => setShowGiftModal(false)}
+          onSuccess={() => {
+            setShowGiftModal(false);
+
             window.location.reload();
           }}
         />
