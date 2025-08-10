@@ -9,6 +9,7 @@ import {
 import { useState, useEffect } from "react";
 import { parseEther } from "viem";
 import { groveToast } from "@/lib/toast";
+import { formatBtcAmount } from "@/lib/btc-conversion";
 
 interface CircleFormProps {
   onSuccess?: () => void;
@@ -43,6 +44,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
     fixedAmount: "",
     frequency: "MONTHLY",
     deadline: "",
+    hasDeadline: true, // New field to control deadline requirement
   });
 
   useEffect(() => {
@@ -87,16 +89,42 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
       const fixedAmountWei = formData.fixedAmount
         ? parseEther(formData.fixedAmount)
         : BigInt(0);
-      const deadlineTimestamp = BigInt(
-        Math.floor(new Date(formData.deadline).getTime() / 1000)
-      );
+
+      // Deadline validation based on payment type
+      let deadlineTimestamp = BigInt(0); // Default to no deadline (0)
+
+      if (formData.paymentType === 0) {
+        // One-time payments: Deadline is REQUIRED
+        if (!formData.deadline) {
+          groveToast.error("One-time payment circles must have a deadline");
+          return;
+        }
+        deadlineTimestamp = BigInt(
+          Math.floor(new Date(formData.deadline).getTime() / 1000)
+        );
+        if (deadlineTimestamp <= BigInt(Math.floor(Date.now() / 1000))) {
+          groveToast.error("Deadline must be in the future");
+          return;
+        }
+      } else if (formData.paymentType === 1) {
+        // Recurring payments: Deadline is OPTIONAL
+        if (formData.hasDeadline && formData.deadline) {
+          deadlineTimestamp = BigInt(
+            Math.floor(new Date(formData.deadline).getTime() / 1000)
+          );
+          if (deadlineTimestamp <= BigInt(Math.floor(Date.now() / 1000))) {
+            groveToast.error("Deadline must be in the future");
+            return;
+          }
+        } else if (formData.hasDeadline && !formData.deadline) {
+          groveToast.error("Please set a deadline or choose 'No Deadline'");
+          return;
+        }
+        // If hasDeadline is false, deadlineTimestamp stays 0 (no deadline)
+      }
 
       if (targetAmountWei <= 0) {
         groveToast.error("Target amount must be greater than 0");
-        return;
-      }
-      if (deadlineTimestamp <= BigInt(Math.floor(Date.now() / 1000))) {
-        groveToast.error("Deadline must be in the future");
         return;
       }
       if (formData.paymentType === 1 && fixedAmountWei <= 0) {
@@ -182,6 +210,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
                 fixedAmount: "",
                 frequency: "MONTHLY",
                 deadline: "",
+                hasDeadline: true,
               });
 
               if (onSuccess) {
@@ -315,12 +344,21 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
               name='targetAmount'
               value={formData.targetAmount}
               onChange={handleInputChange}
-              placeholder='0.1'
-              step='0.001'
+              placeholder='0.001'
+              step='0.0001'
               min='0'
               className='w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300'
               required
             />
+            {formData.targetAmount && parseFloat(formData.targetAmount) > 0 && (
+              <p className='text-xs text-gray-300 mt-1'>
+                ≈{" "}
+                {formatBtcAmount(formData.targetAmount, {
+                  showBoth: false,
+                  btcFirst: false,
+                })}
+              </p>
+            )}
           </div>
 
           <div>
@@ -375,12 +413,22 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
                 name='fixedAmount'
                 value={formData.fixedAmount}
                 onChange={handleInputChange}
-                placeholder='0.01'
-                step='0.001'
+                placeholder='0.001'
+                step='0.0001'
                 min='0'
                 className='w-full p-4 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500'
                 required
               />
+              {formData.fixedAmount && parseFloat(formData.fixedAmount) > 0 && (
+                <p className='text-xs text-gray-300 mt-1'>
+                  ≈{" "}
+                  {formatBtcAmount(formData.fixedAmount, {
+                    showBoth: false,
+                    btcFirst: false,
+                  })}{" "}
+                  per payment
+                </p>
+              )}
               <p className='text-xs text-gray-300 mt-2 flex items-center'>
                 <span className='mr-1'>🔄</span>
                 This amount will be contributed{" "}
@@ -390,19 +438,99 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
           </div>
         )}
 
-        <div>
-          <label className='block text-sm text-left font-medium text-white mb-2'>
-            Goal Deadline *
-          </label>
-          <input
-            type='datetime-local'
-            name='deadline'
-            value={formData.deadline}
-            onChange={handleInputChange}
-            className='w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white backdrop-blur-sm transition-all duration-300'
-            required
-          />
-        </div>
+        {/* Goal Deadline Controls - Compulsory for One-Time, Optional for Recurring */}
+        {formData.paymentType === 0 ? (
+          // One-Time Payments: Deadline is COMPULSORY
+          <div className='bg-green-500/20 border-2 border-green-500 rounded-lg p-6 space-y-4'>
+            <h3 className='text-green-300 font-bold text-lg'>
+              💰 One-Time Payment Settings
+            </h3>
+
+            <div>
+              <label className='block text-sm text-left font-medium text-white mb-2'>
+                Goal Deadline *
+              </label>
+              <input
+                type='datetime-local'
+                name='deadline'
+                value={formData.deadline}
+                onChange={handleInputChange}
+                className='w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white backdrop-blur-sm transition-all duration-300'
+                required
+              />
+              <p className='text-xs text-gray-300 mt-1'>
+                Set payment deadlines
+              </p>
+            </div>
+          </div>
+        ) : (
+          // Recurring Payments: Deadline is OPTIONAL
+          <div className='bg-blue-500/20 border-2 border-blue-500 rounded-lg p-6 space-y-4'>
+            <h3 className='text-blue-300 font-bold text-lg'>
+              ⏰ Recurring Payment Deadline (Optional)
+            </h3>
+
+            <div>
+              <label className='block text-sm text-left font-medium text-white mb-3'>
+                Goal Deadline
+              </label>
+
+              {/* Deadline Option Toggle for Recurring Only */}
+              <div className='flex space-x-4 mb-4'>
+                <label className='flex items-center'>
+                  <input
+                    type='radio'
+                    name='hasDeadline'
+                    checked={formData.hasDeadline === true}
+                    onChange={() =>
+                      setFormData((prev) => ({ ...prev, hasDeadline: true }))
+                    }
+                    className='mr-2 text-primary focus:ring-primary'
+                  />
+                  <span className='text-white text-sm'>Set deadline</span>
+                </label>
+                <label className='flex items-center'>
+                  <input
+                    type='radio'
+                    name='hasDeadline'
+                    checked={formData.hasDeadline === false}
+                    onChange={() =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        hasDeadline: false,
+                        deadline: "",
+                      }))
+                    }
+                    className='mr-2 text-primary focus:ring-primary'
+                  />
+                  <span className='text-white text-sm'>No deadline</span>
+                </label>
+              </div>
+
+              {/* Deadline Input (only shown if hasDeadline is true) */}
+              {formData.hasDeadline && (
+                <input
+                  type='datetime-local'
+                  name='deadline'
+                  value={formData.deadline}
+                  onChange={handleInputChange}
+                  className='w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white backdrop-blur-sm transition-all duration-300'
+                  required={formData.hasDeadline}
+                />
+              )}
+
+              {!formData.hasDeadline && (
+                <div className='bg-blue-500/10 border border-blue-500/30 rounded-lg p-3'>
+                  <p className='text-blue-200 text-sm flex items-center'>
+                    <span className='mr-2'>∞</span>
+                    This recurring circle will run indefinitely without a
+                    deadline
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Transaction Status */}
         {isPending && (
@@ -472,7 +600,11 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
             !isOnCorrectNetwork ||
             !formData.name ||
             !formData.targetAmount ||
-            !formData.deadline ||
+            // One-time payments always need deadline, recurring only if hasDeadline is true
+            (formData.paymentType === 0 && !formData.deadline) ||
+            (formData.paymentType === 1 &&
+              formData.hasDeadline &&
+              !formData.deadline) ||
             (formData.paymentType === 1 && !formData.fixedAmount)
           }
           className='w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-white py-4 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-300 hover-lift disabled:hover:scale-100 shadow-lg hover:shadow-primary/25'

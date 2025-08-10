@@ -2,13 +2,18 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
-import { useAchievements } from "@/hooks/useAchievements";
 import { useStreakTracking } from "@/hooks/useStreakTracking";
 import { parseEther } from "viem";
 import { groveToast } from "@/lib/toast";
+import { formatBtcAmount } from "@/lib/btc-conversion";
 
 import { useWriteContract, useReadContract } from "wagmi";
-import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/contracts/constants";
+import {
+  GROVE_CONTRACT_ADDRESS,
+  GROVE_ABI,
+  GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
+  GROVE_ACHIEVEMENTS_ABI,
+} from "@/contracts/constants";
 
 interface ContributeFormProps {
   circleId: string;
@@ -39,7 +44,6 @@ export default function ContributeForm({
   const [hash, setHash] = useState<string | undefined>(undefined);
   const { primaryWallet, isConnected } = useDynamicConnection();
   const address = primaryWallet?.address;
-  const { checkAndAwardAchievements } = useAchievements();
   const { recordActivity } = useStreakTracking();
 
   const isRecurringCircle = circlePaymentType === "RECURRING";
@@ -164,30 +168,80 @@ export default function ContributeForm({
         console.warn("Failed to log contribution:", logError);
       }
 
-      const achievementStats = {
-        totalContributed: contributionAmount,
-        circlesCompleted: 1,
-        currentStreak: 1,
-        invitedMembers: 0,
-        isFirstContribution: false,
-      };
+      // Track contribution and trigger achievement check directly in frontend
+      try {
+        console.log("🔍 Calling achievement calculation API...");
+        // Calculate achievements based on actual contribution data
+        const achievementResponse = await fetch("/api/achievements/calculate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userAddress: address,
+            contributionAmount: amount,
+            circleId,
+            txHash: hash,
+          }),
+        });
 
-      await checkAndAwardAchievements(achievementStats);
+        console.log(
+          "🔍 Achievement response status:",
+          achievementResponse.status
+        );
+
+        if (achievementResponse.ok) {
+          const achievementData = await achievementResponse.json();
+          console.log("🔍 Achievement data received:", achievementData);
+
+          // Show toast notifications for any new achievements earned
+          if (
+            achievementData.achievements &&
+            achievementData.achievements.length > 0
+          ) {
+            console.log(
+              "🎉 Showing achievement toasts for:",
+              achievementData.achievements
+            );
+            setTimeout(() => {
+              achievementData.achievements.forEach((achievement: any) => {
+                groveToast.success(
+                  `🎉 Achievement Unlocked: ${achievement.name}! ${achievement.icon}\n${achievement.description}`,
+                  {
+                    autoClose: 6000,
+                  }
+                );
+              });
+
+              // Also show a summary if multiple achievements
+              if (achievementData.achievements.length > 1) {
+                groveToast.success(
+                  `🏆 Earned ${achievementData.achievements.length} achievements! Check your profile to see them all.`,
+                  {
+                    autoClose: 8000,
+                  }
+                );
+              }
+            }, 1500); // Delay to show after contribution success
+          } else {
+            console.log("🔍 No new achievements earned");
+          }
+        } else {
+          console.error(
+            "❌ Achievement API error:",
+            await achievementResponse.text()
+          );
+        }
+      } catch (achievementError) {
+        console.warn("Failed to calculate achievements:", achievementError);
+      }
+
       await recordActivity("CONTRIBUTION");
 
       if (onContributionSuccess) {
-        console.log("🎯 Calling onContributionSuccess with:", {
-          circleId,
-          contributionAmount: contributionAmount.toString(),
-        });
         onContributionSuccess(circleId, contributionAmount);
       }
 
       if (onRefresh) {
         setTimeout(() => {
-          console.log(
-            "🔄 No real-time update available, triggering refresh..."
-          );
           onRefresh();
         }, 1000);
       }
@@ -244,13 +298,6 @@ export default function ContributeForm({
               <button
                 className='flex-1 py-2 px-4 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 transition-colors text-sm'
                 onClick={() => {
-                  console.log("🔄 Manually refreshing membership status...");
-                  console.log("Debug info:", {
-                    onChainId,
-                    address,
-                    circleId,
-                    isMember,
-                  });
                   refetchMembership();
                 }}
               >
@@ -343,7 +390,7 @@ export default function ContributeForm({
               </label>
               <input
                 type='number'
-                step='0.00001'
+                step='0.0001'
                 min='0'
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
@@ -351,9 +398,20 @@ export default function ContributeForm({
                 placeholder='0.001'
                 required
               />
-              <p className='text-xs text-gray-400 mt-1'>
-                Enter the amount in BTC you want to contribute
-              </p>
+              <div className='flex justify-between text-xs mt-1'>
+                <p className='text-gray-400'>
+                  Enter the amount in BTC you want to contribute
+                </p>
+                {amount && parseFloat(amount) > 0 && (
+                  <p className='text-gray-300'>
+                    ≈{" "}
+                    {formatBtcAmount(amount, {
+                      showBoth: false,
+                      btcFirst: false,
+                    })}
+                  </p>
+                )}
+              </div>
             </div>
 
             {mutation.isError && (

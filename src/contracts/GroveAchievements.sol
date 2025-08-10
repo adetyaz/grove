@@ -129,6 +129,55 @@ contract GroveAchievements {
     }
 
     /**
+     * @dev Claim achievement if user has earned it (public function)
+     * Anyone can call this to mint achievements they've earned
+     */
+    function claimAchievement(uint256 achievementId) external {
+        address user = msg.sender;
+        require(!achievementNFT.hasAchievement(user, achievementId), "User already has achievement");
+        require(_hasEarnedAchievement(user, achievementId), "Achievement not earned");
+        
+        achievementNFT.mintAchievement(user, achievementId);
+        emit AchievementAwarded(user, achievementId);
+    }
+
+    /**
+     * @dev Check if user has earned a specific achievement
+     */
+    function _hasEarnedAchievement(address user, uint256 achievementId) internal view returns (bool) {
+        uint256 totalContributed = userTotalContributions[user];
+        
+        if (achievementId == 0) {
+            // First contribution - if they have any contributions
+            return totalContributed > 0;
+        } else if (achievementId == 1) {
+            // 0.001 BTC milestone
+            return totalContributed >= 0.001 ether;
+        } else if (achievementId == 2) {
+            // 0.01 BTC milestone
+            return totalContributed >= 0.01 ether;
+        } else if (achievementId == 3) {
+            // Circle completed - for now, just check if they have circles
+            return userCircleCount[user] > 0;
+        } else if (achievementId == 4) {
+            // Streak achievement - simplified check
+            return userCircleCount[user] >= 1;
+        } else if (achievementId == 5) {
+            // Social butterfly - 5+ invites
+            return userInviteCount[user] >= 5;
+        }
+        
+        return false;
+    }
+
+    /**
+     * @dev Public function to check if user has earned an achievement
+     */
+    function hasEarnedAchievement(address user, uint256 achievementId) external view returns (bool) {
+        return _hasEarnedAchievement(user, achievementId);
+    }
+
+    /**
      * @dev Update achievement contract (admin only)
      */
     function updateAchievementNFT(address newAchievementNFT) external onlyAdmin {

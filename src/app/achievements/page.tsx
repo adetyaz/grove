@@ -6,6 +6,7 @@ import {
 } from "@/hooks/useAchievements";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,13 +17,21 @@ export default function AchievementsPage() {
   const { user, primaryWallet } = useDynamicConnection();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [filter, setFilter] = useState<"all" | "earned" | "locked">("all");
+  const [filter, setFilter] = useState<
+    "all" | "earned" | "locked" | "claimable"
+  >("all");
+  const [claimableAchievements, setClaimableAchievements] = useState<number[]>(
+    []
+  );
+  const [loadingClaimable, setLoadingClaimable] = useState(false);
 
   const {
     achievementProgress,
     loadingAchievements,
     achievementCount,
     achievementStats,
+    checkClaimableAchievements,
+    claimAchievementNFT,
   } = useAchievements();
 
   const connectionState = {
@@ -39,6 +48,47 @@ export default function AchievementsPage() {
       router.push("/");
     }
   }, [mounted, connectionState.isConnected, router]);
+
+  // Check for claimable achievements when component loads
+  const loadClaimableAchievements = useCallback(async () => {
+    if (!primaryWallet?.address) return;
+
+    try {
+      setLoadingClaimable(true);
+
+      // Check which achievements are claimable (earned but not minted)
+      const allAchievementIds = achievementProgress.map((a) => a.id);
+      const claimableData = await checkClaimableAchievements(allAchievementIds);
+
+      if (claimableData?.claimable) {
+        setClaimableAchievements(claimableData.claimable);
+      }
+    } catch (error) {
+      console.error("Error checking claimable achievements:", error);
+    } finally {
+      setLoadingClaimable(false);
+    }
+  }, [primaryWallet?.address, achievementProgress, checkClaimableAchievements]);
+
+  useEffect(() => {
+    if (primaryWallet?.address && mounted) {
+      loadClaimableAchievements();
+    }
+  }, [primaryWallet?.address, mounted, loadClaimableAchievements]);
+
+  const handleClaimAchievement = async (achievementId: number) => {
+    try {
+      await claimAchievementNFT(achievementId);
+
+      // Refresh claimable achievements after successful claim
+      await loadClaimableAchievements();
+
+      groveToast.success("🎉 Achievement NFT claimed successfully!");
+    } catch (error) {
+      console.error("Error claiming achievement:", error);
+      groveToast.error("Failed to claim achievement NFT");
+    }
+  };
 
   const handleShare = (achievement: any) => {
     const shareText = `🏆 I just unlocked "${achievement.name}" on Grove! ${achievement.description} #GroveAchievements #Bitcoin`;
@@ -58,6 +108,8 @@ export default function AchievementsPage() {
   const filteredAchievements = achievementProgress.filter((achievement) => {
     if (filter === "earned") return achievement.earned;
     if (filter === "locked") return !achievement.earned;
+    if (filter === "claimable")
+      return claimableAchievements.includes(achievement.id);
     return true;
   });
 
@@ -165,6 +217,7 @@ export default function AchievementsPage() {
           {[
             { key: "all", label: "All Achievements", icon: Award },
             { key: "earned", label: "Earned", icon: Trophy },
+            { key: "claimable", label: "Claimable", icon: Target },
             { key: "locked", label: "Locked", icon: Lock },
           ].map(({ key, label, icon: Icon }) => (
             <Button
@@ -184,6 +237,8 @@ export default function AchievementsPage() {
                   ? ACHIEVEMENT_DEFINITIONS.length
                   : key === "earned"
                   ? achievementCount
+                  : key === "claimable"
+                  ? claimableAchievements.length
                   : ACHIEVEMENT_DEFINITIONS.length - achievementCount}
               </Badge>
             </Button>
@@ -209,6 +264,8 @@ export default function AchievementsPage() {
                 className={`transition-all duration-300 hover-lift ${
                   achievement.earned
                     ? "bg-gradient-to-br from-accent/20 to-accent/30 border-accent/40"
+                    : claimableAchievements.includes(achievement.id)
+                    ? "bg-gradient-to-br from-primary/20 to-primary/30 border-primary/40"
                     : "bg-white/10 border-white/20 opacity-75"
                 }`}
               >
@@ -226,14 +283,21 @@ export default function AchievementsPage() {
                         <CardTitle className='text-white text-lg'>
                           {achievement.name}
                         </CardTitle>
-                        {achievement.earned && (
+                        {achievement.earned ? (
                           <Badge
                             variant='secondary'
                             className='bg-accent/20 text-accent mt-1'
                           >
                             Unlocked
                           </Badge>
-                        )}
+                        ) : claimableAchievements.includes(achievement.id) ? (
+                          <Badge
+                            variant='secondary'
+                            className='bg-primary/20 text-primary mt-1'
+                          >
+                            Claimable
+                          </Badge>
+                        ) : null}
                       </div>
                     </div>
                     {achievement.earned ? (
@@ -244,6 +308,20 @@ export default function AchievementsPage() {
                         className='border-accent/40 text-accent hover:bg-accent/20'
                       >
                         <Share2 className='w-4 h-4' />
+                      </Button>
+                    ) : claimableAchievements.includes(achievement.id) ? (
+                      <Button
+                        variant='default'
+                        size='sm'
+                        onClick={() => handleClaimAchievement(achievement.id)}
+                        className='bg-primary hover:bg-primary/90 text-black'
+                        disabled={loadingClaimable}
+                      >
+                        {loadingClaimable ? (
+                          <div className='w-4 h-4 animate-spin rounded-full border-b-2 border-current' />
+                        ) : (
+                          "Claim NFT"
+                        )}
                       </Button>
                     ) : (
                       <Lock className='w-5 h-5 text-gray-500' />

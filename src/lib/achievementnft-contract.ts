@@ -2,7 +2,7 @@ import {
   ACHIEVEMENTNFT_CONTRACT_ADDRESS,
   ACHIEVEMENTNFT_ABI,
 } from "@/contracts/constants";
-import { getPublicClient } from "@/lib/web3";
+import { getPublicClient } from "@/lib/clients";
 import { type Address } from "viem";
 
 export class AchievementNFTContractService {

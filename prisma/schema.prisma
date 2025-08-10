@@ -149,7 +149,34 @@ model StreakData {
   currentStreak     Int      @default(0)
   longestStreak     Int      @default(0)
   lastActivityDate  DateTime?
-  streakType        String   @default("CONTRIBUTION") // "CONTRIBUTION", "LOGIN", "ANY"
+  streakType        String   @default("CONTRIBUTION") 
   
   @@index([userAddress])
+}
+
+// PHASE 1: Email Claim System - NEW TABLE (Non-disruptive)
+model GiftClaimInvite {
+  id               String   @id @default(uuid())
+  giftId           String   // References the gift transaction hash or event
+  recipientEmail   String
+  senderAddress    String
+  senderName       String?
+  circleId         String
+  circleName       String
+  amount           String   // Gift amount as string (for bigint)
+  message          String?
+  occasion         String?  // Birthday, wedding, etc.
+  claimToken       String   @unique // Secure claim token
+  emailSent        Boolean  @default(false)
+  emailSentAt      DateTime?
+  claimedAt        DateTime?
+  claimedByAddress String?  // Address that claimed the gift
+  expiresAt        DateTime // Token expiration (48 hours)
+  createdAt        DateTime @default(now())
+  
+  @@index([recipientEmail])
+  @@index([claimToken])
+  @@index([senderAddress])
+  @@index([circleId])
+  @@index([expiresAt])
 }

@@ -10,6 +10,9 @@ contract SatVault {
     // Grove contract address - authorized to manage circles
     address public grove;
     
+    // NEW: InheritanceModule integration
+    address public inheritanceModule;
+    
     // Circle treasury structure
     struct Circle {
         address owner;
@@ -49,6 +52,14 @@ contract SatVault {
         uint256 indexed circleId,
         address indexed member
     );
+    
+    // NEW: Inheritance events
+    event InheritanceWithdrawn(
+        uint256 indexed circleId,
+        address indexed deceased,
+        address indexed beneficiary,
+        uint256 amount
+    );
 
     // Errors
     error NotCircleOwner();
@@ -74,6 +85,12 @@ contract SatVault {
     modifier onlyAdmin() {
         // Only allow grove updates before grove is set, or from current grove
         if (grove != address(0) && msg.sender != grove) revert NotAuthorized();
+        _;
+    }
+
+    // NEW: Inheritance authorization
+    modifier onlyInheritanceModule() {
+        require(msg.sender == inheritanceModule, "Not authorized InheritanceModule");
         _;
     }
 
@@ -119,7 +136,7 @@ contract SatVault {
     }
 
     /**
-     * @dev Deposit funds to circle treasury
+     * @dev Deposit funds to circle treasury (safe, non-breaking version)
      */
     function deposit(uint256 circleId) external payable {
         Circle storage circle = circles[circleId];
@@ -129,6 +146,15 @@ contract SatVault {
         circle.treasuryBalance += msg.value;
         contributions[circleId][msg.sender] += msg.value;
         lastContributionTime[circleId][msg.sender] = block.timestamp;
+        
+        // SAFE: Only record activity if inheritance module is set
+        if (inheritanceModule != address(0)) {
+            try IInheritanceModule(inheritanceModule).recordActivity(circleId, msg.sender) {
+                // Activity recorded successfully
+            } catch {
+                // Silently continue if inheritance module fails - don't break deposits
+            }
+        }
         
         emit Deposit(circleId, msg.sender, msg.value);
     }
@@ -211,4 +237,44 @@ contract SatVault {
         require(newGrove != address(0), "Invalid grove address");
         grove = newGrove;
     }
+
+    // NEW INHERITANCE FUNCTIONS
+    
+    /**
+     * @dev Set InheritanceModule contract address (admin only)
+     */
+    function setInheritanceModule(address _inheritanceModule) external onlyAdmin {
+        require(_inheritanceModule != address(0), "Invalid inheritance module address");
+        inheritanceModule = _inheritanceModule;
+    }
+
+    /**
+     * @dev Withdraw inheritance funds (only InheritanceModule can call)
+     */
+    function withdrawInheritance(
+        uint256 circleId, 
+        address deceased, 
+        address beneficiary, 
+        uint256 amount
+    ) external onlyInheritanceModule {
+        Circle storage circle = circles[circleId];
+        
+        require(contributions[circleId][deceased] >= amount, "Insufficient deceased member contributions");
+        require(circle.treasuryBalance >= amount, "Insufficient circle balance");
+        
+        // Deduct from deceased member's contributions and circle balance
+        contributions[circleId][deceased] -= amount;
+        circle.treasuryBalance -= amount;
+        
+        // Transfer to beneficiary
+        (bool success, ) = beneficiary.call{value: amount}("");
+        require(success, "Transfer failed");
+        
+        emit InheritanceWithdrawn(circleId, deceased, beneficiary, amount);
+    }
+}
+
+// Interface for InheritanceModule integration
+interface IInheritanceModule {
+    function recordActivity(uint256 circleId, address member) external;
 }

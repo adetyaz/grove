@@ -3,13 +3,13 @@ export const SATVAULT_CONTRACT_ADDRESS =
 export const GROVE_CONTRACT_ADDRESS =
   "0xd6f967aCcf922dECf0d293625223F63b23055d15";
 export const GIFTENGINE_CONTRACT_ADDRESS =
-  "0x63c49617df7211cab09418978a63c9d010189d2c";
+  "0xB1F7c95d4B9dE383171b931f897E443Ff0339d81";
 export const ACHIEVEMENTNFT_CONTRACT_ADDRESS =
   "0x785453Ec2bbbe87b5E5D19f91c810Be0D4704A14";
 export const GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS =
-  "0x301aC5745348Ffb28120c83Cc2927bCa8169b983";
+  "0x33f085b99AA6219CE6eE3174FdB3191B0e29B738";
 export const INHERITANCEMODULE_CONTRACT_ADDRESS =
-  "0x70a84d0910584e77dc7f42ea2fe99f4a0a5cc028";
+  "0xc1619275872C44B5FB1634d78c9c75D78b84d5CD";
 
 import SATVAULT_ABI from "@/contracts/ABIs/SatVault.json";
 import GROVE_ABI from "@/contracts/ABIs/Grove.json";
@@ -30,7 +30,7 @@ import { type Address } from "viem";
 
 // Citrea Network Configuration
 export const CITREA_TESTNET = {
-  id: 5115, // Citrea testnet chain ID
+  id: 5115,
   name: "Citrea Testnet",
   network: "citrea-testnet",
   nativeCurrency: {
@@ -75,7 +75,6 @@ export const CONTRACT_EVENTS = {
   INHERITANCE_CLAIMED: "InheritanceClaimed",
 } as const;
 
-// PaymentType enum mapping (from contract)
 export enum PaymentType {
   OneTime = 0,
   Recurring = 1,

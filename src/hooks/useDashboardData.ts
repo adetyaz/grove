@@ -74,12 +74,6 @@ export function useDashboardData() {
       if (dbData.circles && dbData.circles.length > 0) {
         const dbCircles = await Promise.all(
           dbData.circles.map(async (circle: any) => {
-            console.log("📊 Processing circle from DB:", {
-              name: circle.name,
-              paymentType: circle.paymentType,
-              id: circle.id,
-            });
-
             const targetAmount = BigInt(circle.targetAmount);
             const deadline = BigInt(
               Math.floor(new Date(circle.deadline).getTime() / 1000)
@@ -178,28 +172,11 @@ export function useDashboardData() {
 
   const updateCircleContribution = useCallback(
     (circleId: string, contributionAmount: bigint) => {
-      console.log("💰 updateCircleContribution called with:", {
-        circleId,
-        contributionAmount: contributionAmount.toString(),
-      });
-
       setDashboardData((prevData) => {
-        console.log("🔍 Current dashboard data before update:", {
-          currentCircles: prevData.circles.map((c) => ({
-            id: c.id,
-            name: c.name,
-            currentAmount: c.currentAmount.toString(),
-          })),
-        });
-
         const updatedCircles = prevData.circles.map((circle) => {
           if (circle.id === circleId) {
             const newCurrentAmount = circle.currentAmount + contributionAmount;
-            console.log(`🔄 Updating circle ${circle.name}:`, {
-              oldAmount: circle.currentAmount.toString(),
-              contributionAmount: contributionAmount.toString(),
-              newAmount: newCurrentAmount.toString(),
-            });
+
             return {
               ...circle,
               currentAmount: newCurrentAmount,
@@ -222,12 +199,6 @@ export function useDashboardData() {
           goalsReached,
           circles: updatedCircles,
         };
-
-        console.log("✅ Dashboard data updated:", {
-          oldTotalSaved: prevData.totalSaved.toString(),
-          newTotalSaved: newData.totalSaved.toString(),
-          circleCount: newData.circles.length,
-        });
 
         return newData;
       });

@@ -2,7 +2,7 @@ import {
   INHERITANCEMODULE_CONTRACT_ADDRESS,
   INHERITANCEMODULE_ABI,
 } from "@/contracts/constants";
-import { getPublicClient } from "@/lib/web3";
+import { getPublicClient } from "@/lib/clients";
 import { type Address } from "viem";
 
 export class InheritanceModuleContractService {

@@ -18,7 +18,6 @@ import {
   Users,
   Target,
   TrendingUp,
-  Gift,
   Wallet,
   ArrowLeft,
   Trophy,
@@ -333,10 +332,19 @@ export default function DashboardPage() {
                 <Link href='/achievements' className='block'>
                   <Button
                     variant='outline'
-                    className='w-full border-accent text-accent hover:bg-accent hover:text-white transition-all duration-300'
+                    className='w-full border-accent text-accent hover:bg-accent hover:text-white transition-all duration-300 mb-3'
                   >
                     <Trophy className='w-4 h-4 mr-2' />
                     View Achievements
+                  </Button>
+                </Link>
+                <Link href='/test-achievements' className='block'>
+                  <Button
+                    variant='outline'
+                    className='w-full border-primary text-primary hover:bg-primary hover:text-black transition-all duration-300'
+                  >
+                    <Target className='w-4 h-4 mr-2' />
+                    🧪 Test Achievements
                   </Button>
                 </Link>
               </CardContent>

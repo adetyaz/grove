@@ -7,7 +7,7 @@ import {
   type AddMemberParams,
   type ContributeParams,
 } from "@/contracts/constants";
-import { getPublicClient } from "@/lib/web3";
+import { getPublicClient } from "@/lib/clients";
 import { type Address } from "viem";
 
 export class GroveContractService {
@@ -47,7 +47,7 @@ export class GroveContractService {
       const [id, owner, name] = result as [
         bigint, // id
         Address, // owner
-        string, // name
+        string // name
       ];
 
       // Get members separately using getMembers function

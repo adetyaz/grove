@@ -7,15 +7,15 @@ import {
 } from "@/contracts/constants";
 import { useCallback, useMemo } from "react";
 import { groveToast } from "@/lib/toast";
+import { useAchievementClaiming } from "@/hooks/useAchievementClaiming";
 
-// Achievement types matching the smart contract
 export enum AchievementType {
   FIRST_CONTRIBUTION = 0,
   MILESTONE_001_BTC = 1,
   MILESTONE_01_BTC = 2,
   CIRCLE_COMPLETED = 3,
   STREAK_7_DAYS = 4,
-  SOCIAL_BUTTERFLY = 5, // Invited 5+ members
+  SOCIAL_BUTTERFLY = 5,
 }
 
 export interface Achievement {
@@ -74,7 +74,14 @@ export function useAchievements() {
   const address = primaryWallet?.address;
   const { writeContractAsync } = useWriteContract();
 
-  // Get user's earned achievements from GroveAchievements contract
+  // Use the new achievement claiming functionality
+  const {
+    claimAchievement: claimAchievementNFT,
+    claimMultipleAchievements,
+    checkClaimableAchievements,
+    isConnected,
+  } = useAchievementClaiming();
+
   const {
     data: userStats,
     isLoading: loadingAchievements,
@@ -86,15 +93,13 @@ export function useAchievements() {
     args: address ? [address] : undefined,
     query: {
       enabled: !!address,
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      staleTime: 1000 * 60 * 5,
     },
   });
 
-  // Extract achievements from user stats
   const userAchievements =
     userStats && Array.isArray(userStats) ? userStats[2] : undefined;
 
-  // Check if user has a specific achievement
   const hasAchievement = useCallback(
     (achievementId: AchievementType): boolean => {
       if (!userAchievements || !Array.isArray(userAchievements)) return false;
@@ -103,7 +108,6 @@ export function useAchievements() {
     [userAchievements]
   );
 
-  // Get achievement progress/statistics from GroveAchievements
   const { data: achievementStats } = useReadContract({
     address: GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
     abi: GROVE_ACHIEVEMENTS_ABI,
@@ -111,11 +115,10 @@ export function useAchievements() {
     args: address ? [address] : undefined,
     query: {
       enabled: !!address,
-      staleTime: 1000 * 60 * 2, // 2 minutes
+      staleTime: 1000 * 60 * 2,
     },
   });
 
-  // Mint achievement NFT through GroveAchievements contract
   const mintAchievement = useCallback(
     async (achievementId: AchievementType) => {
       if (!address) {
@@ -123,42 +126,75 @@ export function useAchievements() {
         return false;
       }
 
-      // Check if user already has this achievement
       if (hasAchievement(achievementId)) {
         groveToast.info("You already have this achievement!");
         return false;
       }
 
       try {
-        groveToast.info("Minting achievement NFT...");
+        // Use the new claim functionality which handles the permissionless claiming
+        await claimAchievementNFT(achievementId);
 
-        const txHash = await writeContractAsync({
-          address: GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
-          abi: GROVE_ACHIEVEMENTS_ABI,
-          functionName: "awardAchievement",
-          args: [address, BigInt(achievementId)],
-        });
-
-        groveToast.transactionPending(txHash);
-
-        // Wait for confirmation and refetch achievements
+        // Refetch achievements after successful claim
         setTimeout(() => {
           refetchAchievements();
         }, 5000);
 
         return true;
       } catch (error: any) {
-        console.error("Failed to mint achievement:", error);
-        groveToast.error(
-          "Failed to mint achievement: " + (error.message || "Unknown error")
-        );
-        return false;
+        console.error("Failed to claim achievement:", error);
+
+        // Fallback to the old method if new claim fails
+        try {
+          groveToast.info("Trying alternative minting method...");
+
+          let txHash;
+          try {
+            txHash = await writeContractAsync({
+              address: GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
+              abi: GROVE_ACHIEVEMENTS_ABI,
+              functionName: "claimAchievement",
+              args: [BigInt(achievementId)],
+            });
+          } catch (claimError: any) {
+            console.warn(
+              "claimAchievement failed, trying awardAchievement:",
+              claimError
+            );
+            txHash = await writeContractAsync({
+              address: GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
+              abi: GROVE_ACHIEVEMENTS_ABI,
+              functionName: "awardAchievement",
+              args: [address, BigInt(achievementId)],
+            });
+          }
+
+          groveToast.transactionPending(txHash);
+
+          setTimeout(() => {
+            refetchAchievements();
+          }, 5000);
+
+          return true;
+        } catch (fallbackError: any) {
+          console.error("Both claim methods failed:", fallbackError);
+          groveToast.error(
+            "Failed to mint achievement: " +
+              (fallbackError.message || "Unknown error")
+          );
+          return false;
+        }
       }
     },
-    [address, hasAchievement, writeContractAsync, refetchAchievements]
+    [
+      address,
+      hasAchievement,
+      claimAchievementNFT,
+      writeContractAsync,
+      refetchAchievements,
+    ]
   );
 
-  // Check and award achievements based on user activity
   const checkAndAwardAchievements = useCallback(
     async (userStats: {
       totalContributed: bigint;
@@ -169,7 +205,6 @@ export function useAchievements() {
     }) => {
       const newAchievements: AchievementType[] = [];
 
-      // First contribution
       if (
         userStats.isFirstContribution &&
         !hasAchievement(AchievementType.FIRST_CONTRIBUTION)
@@ -177,7 +212,6 @@ export function useAchievements() {
         newAchievements.push(AchievementType.FIRST_CONTRIBUTION);
       }
 
-      // Contribution milestones
       const totalBTC = Number(userStats.totalContributed) / 1e18;
       if (
         totalBTC >= 0.001 &&
@@ -192,7 +226,6 @@ export function useAchievements() {
         newAchievements.push(AchievementType.MILESTONE_01_BTC);
       }
 
-      // Circle completion
       if (
         userStats.circlesCompleted > 0 &&
         !hasAchievement(AchievementType.CIRCLE_COMPLETED)
@@ -200,7 +233,6 @@ export function useAchievements() {
         newAchievements.push(AchievementType.CIRCLE_COMPLETED);
       }
 
-      // Streak achievement
       if (
         userStats.currentStreak >= 7 &&
         !hasAchievement(AchievementType.STREAK_7_DAYS)
@@ -208,7 +240,6 @@ export function useAchievements() {
         newAchievements.push(AchievementType.STREAK_7_DAYS);
       }
 
-      // Social achievement
       if (
         userStats.invitedMembers >= 5 &&
         !hasAchievement(AchievementType.SOCIAL_BUTTERFLY)
@@ -216,7 +247,6 @@ export function useAchievements() {
         newAchievements.push(AchievementType.SOCIAL_BUTTERFLY);
       }
 
-      // Mint new achievements
       for (const achievementId of newAchievements) {
         const achievement = ACHIEVEMENT_DEFINITIONS.find(
           (a) => a.id === achievementId
@@ -235,36 +265,69 @@ export function useAchievements() {
     [hasAchievement, mintAchievement]
   );
 
-  // Get user's achievement progress
   const achievementProgress = useMemo(() => {
     return ACHIEVEMENT_DEFINITIONS.map((achievement) => ({
       ...achievement,
       earned: hasAchievement(achievement.id),
-      progress: hasAchievement(achievement.id) ? 100 : 0, // Could be enhanced with partial progress
+      progress: hasAchievement(achievement.id) ? 100 : 0,
     }));
   }, [hasAchievement]);
 
-  // Get total achievements count
   const achievementCount = useMemo(() => {
     if (!userAchievements || !Array.isArray(userAchievements)) return 0;
     return userAchievements.length;
   }, [userAchievements]);
 
+  const syncContributions = useCallback(async () => {
+    if (!address) {
+      groveToast.error("Please connect your wallet first");
+      return false;
+    }
+
+    try {
+      groveToast.info("Syncing contributions with achievement contract...");
+
+      // For now, we'll create a manual sync that reads user's contribution data
+      // from the API and tries to update the contract
+      const response = await fetch(`/api/user/stats?address=${address}`);
+      const userStats = await response.json();
+
+      if (userStats.totalContributed && userStats.totalContributed !== "0") {
+        groveToast.info(
+          `Found ${userStats.totalContributed} total contributions. Check achievements manually for now.`
+        );
+      } else {
+        groveToast.info("No contributions found to sync");
+      }
+
+      return true;
+    } catch (error: any) {
+      console.error("Failed to sync contributions:", error);
+      groveToast.error(
+        "Failed to sync contributions: " + (error.message || "Unknown error")
+      );
+      return false;
+    }
+  }, [address]);
+
   return {
-    // Data
     userAchievements,
     achievementStats,
     achievementProgress,
     achievementCount,
     loadingAchievements,
 
-    // Functions
     hasAchievement,
     mintAchievement,
     checkAndAwardAchievements,
     refetchAchievements,
+    syncContributions,
 
-    // Constants
+    // New achievement claiming functionality
+    claimAchievementNFT,
+    claimMultipleAchievements,
+    checkClaimableAchievements,
+
     ACHIEVEMENT_DEFINITIONS,
   };
 }

@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import { UserPlus } from "lucide-react";
+import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import ContributeForm from "./contribute-form";
 import RecurringPaymentForm from "./recurring-payment-form";
 import InviteForm from "./invite-form";
 import InheritanceForm from "./inheritance-form";
 import InheritanceClaimForm from "./inheritance-claim-form";
+import CircleClaimForm from "./circle-claim-form";
+import GiftForm from "./gift-form";
 import {
   formatBTCAmount,
   calculateProgress,
@@ -27,6 +30,9 @@ export default function CircleDashboard({
     contributionAmount: bigint
   ) => void;
 }) {
+  const { primaryWallet } = useDynamicConnection();
+  const userAddress = primaryWallet?.address;
+
   const [contributeModal, setContributeModal] = useState<{
     isOpen: boolean;
     circleId: string;
@@ -65,6 +71,31 @@ export default function CircleDashboard({
     maxAmount: bigint;
     receiver: string;
   }>({ isOpen: false, circleId: 0, maxAmount: BigInt(0), receiver: "" });
+
+  const [circleClaimModal, setCircleClaimModal] = useState<{
+    isOpen: boolean;
+    circleId: number;
+    circleName: string;
+    targetAmount: bigint;
+    currentAmount: bigint;
+    deadline: string | null;
+    owner: string;
+  }>({
+    isOpen: false,
+    circleId: 0,
+    circleName: "",
+    targetAmount: BigInt(0),
+    currentAmount: BigInt(0),
+    deadline: null,
+    owner: "",
+  });
+
+  const [giftModal, setGiftModal] = useState<{
+    isOpen: boolean;
+    circleId: number;
+    circleName: string;
+    availableAmount: string;
+  }>({ isOpen: false, circleId: 0, circleName: "", availableAmount: "0" });
 
   if (!dashboardData || dashboardData.circles.length === 0) {
     return (
@@ -283,6 +314,46 @@ export default function CircleDashboard({
                   >
                     Set Inheritance
                   </button>
+                  {/* Show different buttons based on circle type and status */}
+                  {(circle.currentAmount >= circle.targetAmount ||
+                    isExpired) && (
+                    <>
+                      {circle.paymentType === "ONETIME" ? (
+                        // For one-time circles: Send Gift (invite recipient)
+                        <button
+                          className='flex-1 bg-gradient-to-r from-pink-500/20 to-pink-600/20 border border-pink-500/30 text-pink-300 py-2 px-3 rounded-lg text-sm font-medium hover:from-pink-500/30 hover:to-pink-600/30 transition-all duration-200'
+                          onClick={() => {
+                            setGiftModal({
+                              isOpen: true,
+                              circleId: circle.id,
+                              circleName: circle.name,
+                              availableAmount: circle.currentAmount.toString(),
+                            });
+                          }}
+                        >
+                          🎁 Send Gift
+                        </button>
+                      ) : (
+                        // For recurring circles: Claim (trigger voting)
+                        <button
+                          className='flex-1 bg-gradient-to-r from-emerald-500/20 to-emerald-600/20 border border-emerald-500/30 text-emerald-300 py-2 px-3 rounded-lg text-sm font-medium hover:from-emerald-500/30 hover:to-emerald-600/30 transition-all duration-200'
+                          onClick={() => {
+                            setCircleClaimModal({
+                              isOpen: true,
+                              circleId: circle.id,
+                              circleName: circle.name,
+                              targetAmount: circle.targetAmount,
+                              currentAmount: circle.currentAmount,
+                              deadline: circle.deadline,
+                              owner: circle.owner,
+                            });
+                          }}
+                        >
+                          🗳️ Start Vote to Claim
+                        </button>
+                      )}
+                    </>
+                  )}
                   <button
                     className='flex-1 bg-gradient-to-r from-yellow-500/20 to-yellow-600/20 border border-yellow-500/30 text-yellow-300 py-2 px-3 rounded-lg text-sm font-medium hover:from-yellow-500/30 hover:to-yellow-600/30 transition-all duration-200'
                     onClick={() => {
@@ -382,6 +453,51 @@ export default function CircleDashboard({
           }
         />
       )}
+
+      {/* Circle Goal/Deadline Claim Modal */}
+      {circleClaimModal.isOpen && (
+        <CircleClaimForm
+          circleId={circleClaimModal.circleId.toString()}
+          onChainId={circleClaimModal.circleId}
+          circleName={circleClaimModal.circleName}
+          targetAmount={circleClaimModal.targetAmount.toString()}
+          currentAmount={circleClaimModal.currentAmount.toString()}
+          deadline={circleClaimModal.deadline || ""}
+          paymentType={
+            dashboardData.circles.find(
+              (c: any) => c.id === circleClaimModal.circleId
+            )?.paymentType || "ONETIME"
+          }
+          isOwner={
+            userAddress?.toLowerCase() === circleClaimModal.owner?.toLowerCase()
+          }
+          onSuccess={() => {
+            refresh();
+            setTimeout(() => {
+              setCircleClaimModal({
+                isOpen: false,
+                circleId: 0,
+                circleName: "",
+                targetAmount: BigInt(0),
+                currentAmount: BigInt(0),
+                deadline: null,
+                owner: "",
+              });
+            }, 1500);
+          }}
+          onClose={() =>
+            setCircleClaimModal({
+              isOpen: false,
+              circleId: 0,
+              circleName: "",
+              targetAmount: BigInt(0),
+              currentAmount: BigInt(0),
+              deadline: null,
+              owner: "",
+            })
+          }
+        />
+      )}
       {recurringModal.isOpen && (
         <RecurringPaymentForm
           circleId={recurringModal.circleId}
@@ -403,6 +519,55 @@ export default function CircleDashboard({
             setInviteModal({ isOpen: false, circleId: "", circleName: "" })
           }
         />
+      )}
+
+      {/* Gift Modal for One-time Circles */}
+      {giftModal.isOpen && (
+        <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'>
+          <div className='bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto'>
+            <div className='p-6'>
+              <div className='flex justify-between items-center mb-4'>
+                <h3 className='text-xl font-semibold'>Send Circle Gift</h3>
+                <button
+                  onClick={() =>
+                    setGiftModal({
+                      isOpen: false,
+                      circleId: 0,
+                      circleName: "",
+                      availableAmount: "0",
+                    })
+                  }
+                  className='text-gray-400 hover:text-gray-600 text-2xl font-bold'
+                >
+                  ×
+                </button>
+              </div>
+              <GiftForm
+                circleId={giftModal.circleId}
+                circleName={giftModal.circleName}
+                onSuccess={() => {
+                  refresh();
+                  setTimeout(() => {
+                    setGiftModal({
+                      isOpen: false,
+                      circleId: 0,
+                      circleName: "",
+                      availableAmount: "0",
+                    });
+                  }, 1500);
+                }}
+                onClose={() =>
+                  setGiftModal({
+                    isOpen: false,
+                    circleId: 0,
+                    circleName: "",
+                    availableAmount: "0",
+                  })
+                }
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

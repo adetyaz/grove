@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { groveContract } from "@/lib/grove-contract";
 import { getDynamicUser } from "@/lib/dynamic";
 import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/contracts/constants";
-import { getPublicClient } from "@/lib/web3";
+import { getPublicClient } from "@/lib/clients";
 
 export async function POST(req: NextRequest) {
   try {
