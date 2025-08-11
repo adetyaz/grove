@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
           }
           
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${process.env.NEXTAUTH_URL}/claim-gift?token=${giftToken}" 
+            <a href="${process.env.NEXTAUTH_URL}/claim?token=${giftToken}" 
                style="background: linear-gradient(135deg, #ec4899, #f97316); color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 18px;">
               🎁 Claim Your Gift
             </a>

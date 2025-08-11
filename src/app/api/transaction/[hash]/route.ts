@@ -9,6 +9,8 @@ import {
 import { CITREA_TESTNET, GROVE_CONTRACT_ADDRESS } from "@/contracts/constants";
 import { prisma } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 // Create a public client for reading blockchain data
 const publicClient = createPublicClient({
   chain: CITREA_TESTNET,

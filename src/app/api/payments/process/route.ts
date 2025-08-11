@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { AutomatedPaymentService } from "@/lib/automated-payment-service";
 import { punishmentSystem } from "@/lib/punishment-system";
 
 export async function POST(request: NextRequest) {
@@ -10,20 +9,6 @@ export async function POST(request: NextRequest) {
 
     if (!expectedToken || authHeader !== `Bearer ${expectedToken}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Initialize automated payment service
-    let paymentService: AutomatedPaymentService;
-    try {
-      paymentService = new AutomatedPaymentService();
-    } catch (error) {
-      return NextResponse.json(
-        {
-          error:
-            "Payment service not configured. Please set SERVICE_WALLET_PRIVATE_KEY environment variable.",
-        },
-        { status: 500 }
-      );
     }
 
     const now = new Date();
@@ -81,44 +66,18 @@ export async function POST(request: NextRequest) {
           data: { status: "PROCESSING" },
         });
 
-        let txResult;
-        if (process.env.USE_REAL_TRANSACTIONS === "true") {
-          // Check if circle has onChainId
-          if (!schedule.circle.onChainId) {
-            throw new Error("Circle not deployed to blockchain");
-          }
+        // NOTE: Automated transactions are disabled for security reasons
+        // All recurring payments are now simulated
+        console.log(
+          `Simulating payment for circle ${schedule.circle.onChainId}, amount: ${schedule.amount}`
+        );
 
-          const walletBalance =
-            await paymentService.checkServiceWalletBalance();
-          if (!walletBalance) {
-            throw new Error("Failed to check service wallet balance");
-          }
-
-          console.log(
-            `Service wallet balance: ${walletBalance.balanceInBTC} BTC`
-          );
-
-          const amountInBTC = (parseFloat(schedule.amount) / 1e18).toString();
-
-          txResult = await paymentService.executeContribution(
-            schedule.circle.onChainId,
-            amountInBTC,
-            schedule.userAddress
-          );
-
-          if (!txResult.success) {
-            throw new Error(txResult.error || "Transaction failed");
-          }
-
-          console.log(`Real transaction executed: ${txResult.txHash}`);
-        } else {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          txResult = {
-            success: true,
-            txHash: `0x${Math.random().toString(16).substr(2, 64)}`,
-          };
-          console.log(`Simulated transaction: ${txResult.txHash}`);
-        }
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const txResult = {
+          success: true,
+          txHash: `0x${Math.random().toString(16).substr(2, 64)}`,
+        };
+        console.log(`Simulated transaction: ${txResult.txHash}`);
 
         await prisma.recurringPayment.update({
           where: { id: payment.id },
@@ -132,7 +91,7 @@ export async function POST(request: NextRequest) {
         // Log the contribution activity
         await fetch(
           `${
-            process.env.NEXTAUTH_URL || "https://grove-wine.vercel.app"
+            process.env.NEXT_PUBLIC_APP_URL || "https://grove-wine.vercel.app"
           }/api/activity/track-contribution`,
           {
             method: "POST",

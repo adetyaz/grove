@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -33,7 +35,6 @@ export async function GET(request: NextRequest) {
       });
     }
 
-   
     const contributionActivities = await prisma.userActivity.findMany({
       where: {
         userAddress: address.toLowerCase(),
@@ -44,30 +45,25 @@ export async function GET(request: NextRequest) {
       },
     });
 
-   
     let totalContributed = BigInt(0);
     for (const activity of contributionActivities) {
       if (activity.metadata) {
         try {
           const metadata = JSON.parse(activity.metadata);
           const amount = metadata.amount || "0";
-          
-          
+
           let satoshis = BigInt(0);
           if (typeof amount === "string") {
             if (amount.includes(".")) {
-              
               const numAmount = parseFloat(amount);
               satoshis = BigInt(Math.floor(numAmount * 100000000));
             } else {
-              
               satoshis = BigInt(amount);
             }
           } else if (typeof amount === "number") {
-         
             satoshis = BigInt(Math.floor(amount * 100000000));
           }
-          
+
           totalContributed += satoshis;
         } catch (error) {
           console.warn("Error parsing activity metadata:", error);
