@@ -10,6 +10,7 @@ import { useState, useEffect } from "react";
 import { parseEther } from "viem";
 import { groveToast } from "@/lib/toast";
 import { formatBtcAmount } from "@/lib/btc-conversion";
+import { PUNISHMENT_PRESETS } from "@/lib/punishment-system";
 
 interface CircleFormProps {
   onSuccess?: () => void;
@@ -45,6 +46,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
     frequency: "MONTHLY",
     deadline: "",
     hasDeadline: true, // New field to control deadline requirement
+    punishmentPreset: "MODERATE" as keyof typeof PUNISHMENT_PRESETS,
   });
 
   useEffect(() => {
@@ -127,7 +129,10 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
         groveToast.error("Target amount must be greater than 0");
         return;
       }
-      if (formData.paymentType === 1 && fixedAmountWei <= 0) {
+      if (
+        formData.paymentType === 1 &&
+        (!formData.fixedAmount || parseFloat(formData.fixedAmount) <= 0)
+      ) {
         groveToast.error("Recurring amount must be greater than 0");
         return;
       }
@@ -152,6 +157,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
           deadline: deadlineTimestamp.toString(),
           ownerWallet: address,
           ownerEmail: user?.email || `${address}@grove.temp`,
+          punishmentPreset: formData.punishmentPreset,
         }),
       });
 
@@ -200,6 +206,46 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
                 `Circle "${formData.name}" created successfully!`
               );
               setIsConfirmed(true);
+
+              // Auto-enable voting for recurring circles
+              if (formData.paymentType === 1) {
+                // 1 = RECURRING
+                try {
+                  groveToast.info(
+                    "Enabling democratic voting for recurring circle..."
+                  );
+
+                  const { votingModuleService } = await import(
+                    "@/lib/voting-module-contract"
+                  );
+
+                  // Enable voting with delegation
+                  const enableHash =
+                    await votingModuleService.enableVotingWithDelegation(
+                      syncData.circleId,
+                      address as `0x${string}`
+                    );
+                  console.log("✅ Voting enabled for circle:", enableHash);
+
+                  // Deposit escrow for voting operations
+                  const escrowHash = await votingModuleService.depositEscrow(
+                    syncData.circleId,
+                    "0.1", // 0.1 ETH
+                    address as `0x${string}`
+                  );
+                  console.log("✅ Escrow deposited for voting:", escrowHash);
+
+                  groveToast.success(
+                    `Circle created with democratic voting enabled!`
+                  );
+                } catch (votingError: any) {
+                  console.error("Failed to enable voting:", votingError);
+                  groveToast.warning(
+                    `Circle created successfully, but voting enablement failed. You can enable it later from the circle page.`
+                  );
+                }
+              }
+
               setIsNavigating(true);
 
               setFormData({
@@ -211,6 +257,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
                 frequency: "MONTHLY",
                 deadline: "",
                 hasDeadline: true,
+                punishmentPreset: "MODERATE" as keyof typeof PUNISHMENT_PRESETS,
               });
 
               if (onSuccess) {
@@ -528,6 +575,105 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Punishment Settings Section - Only for recurring payments */}
+        {formData.paymentType === 1 && (
+          <div className='bg-orange-500/20 border-2 border-orange-500 rounded-lg p-6 space-y-4'>
+            <h3 className='text-orange-300 font-bold text-lg flex items-center'>
+              ⚖️ Missed Payment Policy
+            </h3>
+            <div className='text-orange-100 text-sm space-y-1'>
+              <p>
+                What happens when someone misses their scheduled recurring
+                payment?
+              </p>
+              <p className='text-orange-200'>
+                Choose how strict you want to be with members who don&apos;t pay
+                on time.
+              </p>
+            </div>
+
+            <div>
+              <label className='block text-sm font-medium text-white mb-3'>
+                Choose Enforcement Level *
+              </label>
+              <div className='space-y-3'>
+                {Object.entries(PUNISHMENT_PRESETS).map(([key, preset]) => {
+                  const isSelected = formData.punishmentPreset === key;
+                  return (
+                    <div
+                      key={key}
+                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                        isSelected
+                          ? "border-orange-500 bg-orange-500/20"
+                          : "border-gray-600 bg-gray-800/50 hover:border-gray-500"
+                      }`}
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          punishmentPreset:
+                            key as keyof typeof PUNISHMENT_PRESETS,
+                        })
+                      }
+                    >
+                      <div className='flex items-start justify-between'>
+                        <div className='flex-1'>
+                          <div className='flex items-center space-x-2 mb-2'>
+                            <input
+                              type='radio'
+                              name='punishmentPreset'
+                              value={key}
+                              checked={isSelected}
+                              onChange={handleInputChange}
+                              className='text-orange-500'
+                            />
+                            <h4 className='font-semibold text-white'>
+                              {preset.name}
+                            </h4>
+                          </div>
+                          {preset.enabled ? (
+                            <div className='text-sm text-gray-300 space-y-1'>
+                              <p>
+                                📝 {preset.maxWarnings} warning
+                                {preset.maxWarnings !== 1 ? "s" : ""} for missed
+                                payments (just logged)
+                              </p>
+                              <p>
+                                💰 Then{" "}
+                                {((preset.penaltyMultiplier - 1) * 100).toFixed(
+                                  0
+                                )}
+                                % extra fee on each missed payment
+                              </p>
+                              <p>
+                                ⏸️ Auto-disable payments after{" "}
+                                {preset.autoSuspendAfter} failures (can be
+                                re-enabled)
+                              </p>
+                              {preset.autoSuspendAfter <= 3 &&
+                              !preset.allowAppeals ? (
+                                <p>
+                                  🚫 Get kicked out of circle (no appeals
+                                  allowed)
+                                </p>
+                              ) : (
+                                <p>📋 Can appeal suspensions to rejoin</p>
+                              )}
+                            </div>
+                          ) : (
+                            <p className='text-sm text-gray-300'>
+                              😌 No consequences for missed payments
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}

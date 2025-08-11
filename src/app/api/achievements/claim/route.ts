@@ -20,11 +20,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(
-      `🏆 Checking claimable achievements for ${userAddress}:`,
-      achievementIds
-    );
-
+  
     // Create viem client to read contract data
     const client = createPublicClient({
       chain: CITREA_TESTNET,
@@ -63,7 +59,7 @@ export async function POST(request: NextRequest) {
         try {
           // Check AchievementNFT contract directly for hasAchievement
           hasNFT = await client.readContract({
-            address: "0x785453Ec2bbbe87b5E5D19f91c810Be0D4704A14", // AchievementNFT contract
+            address: "0x30325a1fF2361F72059191aD4Cb97599442B3247",
             abi: [
               {
                 inputs: [
@@ -132,7 +128,7 @@ export async function POST(request: NextRequest) {
           : "No achievements ready to claim",
     };
 
-    console.log(`🏆 Claim check response:`, response);
+   
 
     return NextResponse.json(response);
   } catch (error) {

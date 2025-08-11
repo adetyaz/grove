@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
         ? `${
             request.headers.get("x-forwarded-proto") || "http"
           }://${request.headers.get("host")}`
-        : "http://localhost:3000");
+        : "https://grove-wine.vercel.app");
 
     // Send invitation across all channels using the new notification system
     const results = await fetch(`${baseUrl}/api/notifications/send`, {

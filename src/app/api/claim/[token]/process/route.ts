@@ -56,39 +56,81 @@ export async function POST(
       );
     }
 
-    // Create or update user record
-    await prisma.user.upsert({
-      where: {
-        wallet: userAddress.toLowerCase(),
-      },
-      update: {
-        lastActivityDate: new Date(),
-        email: userEmail || giftClaimInvite.recipientEmail,
-      },
-      create: {
-        wallet: userAddress.toLowerCase(),
-        email: userEmail || giftClaimInvite.recipientEmail,
-        lastActivityDate: new Date(),
-      },
-    });
-
-    // Process the gift transfer
+    // Create or update user record - handle email conflicts properly
     try {
-      // Claim the escrow gift from the blockchain
-      const { giftEngineContract } = await import("@/lib/giftengine-contract");
+      // First, try to find existing user by wallet
+      const existingUser = await prisma.user.findUnique({
+        where: { wallet: userAddress.toLowerCase() },
+      });
+
+      if (existingUser) {
+        // User exists with this wallet - just update activity date
+        await prisma.user.update({
+          where: { wallet: userAddress.toLowerCase() },
+          data: {
+            lastActivityDate: new Date(),
+            // Only update email if it's currently null/empty and new email doesn't conflict
+            ...((!existingUser.email ||
+              existingUser.email.includes("@wallet.local")) &&
+              userEmail && {
+                email: userEmail,
+              }),
+          },
+        });
+      } else {
+        // Check if the email is already taken by another user
+        const targetEmail = userEmail || giftClaimInvite.recipientEmail;
+        const emailConflict = await prisma.user.findUnique({
+          where: { email: targetEmail },
+        });
+
+        if (emailConflict) {
+          // Email is taken, create user with wallet-based email
+          await prisma.user.create({
+            data: {
+              wallet: userAddress.toLowerCase(),
+              email: `${userAddress.toLowerCase()}@wallet.local`,
+              name: `User ${userAddress.slice(0, 8)}`,
+              lastActivityDate: new Date(),
+            },
+          });
+        } else {
+          // Email is free, create user with the target email
+          await prisma.user.create({
+            data: {
+              wallet: userAddress.toLowerCase(),
+              email: targetEmail,
+              name: `User ${userAddress.slice(0, 8)}`,
+              lastActivityDate: new Date(),
+            },
+          });
+        }
+      }
+    } catch (emailError) {
+      console.error("Error handling user record:", emailError);
+      // If all else fails, just ensure user exists with a unique wallet-based email
+      const uniqueWalletEmail = `${userAddress.toLowerCase()}_${Date.now()}@wallet.local`;
 
       try {
-        const claimResult = await giftEngineContract.claimEscrowGift(
-          giftClaimInvite.giftId,
-          userAddress as `0x${string}`
-        );
-        console.log("Gift successfully claimed from escrow:", claimResult.hash);
-      } catch (contractError: any) {
-        console.error("Failed to claim from escrow contract:", contractError);
-        throw new Error(`Escrow claim failed: ${contractError.message}`);
+        await prisma.user.upsert({
+          where: { wallet: userAddress.toLowerCase() },
+          update: { lastActivityDate: new Date() },
+          create: {
+            wallet: userAddress.toLowerCase(),
+            email: uniqueWalletEmail,
+            name: `User ${userAddress.slice(0, 8)}`,
+            lastActivityDate: new Date(),
+          },
+        });
+      } catch (finalError) {
+        console.error("Final user creation failed:", finalError);
+       
       }
+    }
 
-      // Mark the gift as claimed in database
+    
+    try {
+   
       await prisma.giftClaimInvite.update({
         where: { id: giftClaimInvite.id },
         data: {
@@ -117,8 +159,9 @@ export async function POST(
 
       return NextResponse.json({
         success: true,
-        message: "Gift claimed successfully!",
+        message: "Gift claim validated successfully!",
         giftDetails: {
+          giftId: giftClaimInvite.giftId,
           amount: giftClaimInvite.amount,
           senderName: giftClaimInvite.senderName,
           circleName: giftClaimInvite.circleName,
@@ -126,18 +169,13 @@ export async function POST(
           claimedAt: new Date(),
         },
       });
-    } catch (transferError) {
-      console.error("Error processing gift transfer:", transferError);
-
-      // If the transfer fails, we should not mark it as claimed
+    } catch (claimError) {
+      console.error("Error processing gift claim:", claimError);
       return NextResponse.json(
         {
-          error:
-            "Gift claim processed but transfer failed. Please contact support.",
+          error: "Failed to process gift claim",
           details:
-            transferError instanceof Error
-              ? transferError.message
-              : "Unknown error",
+            claimError instanceof Error ? claimError.message : "Unknown error",
         },
         { status: 500 }
       );

@@ -15,11 +15,8 @@ export async function POST(request: NextRequest) {
     // Convert contribution amount to wei (assuming it's in BTC/ETH)
     const amountInWei = parseEther(contributionAmount);
 
-    console.log(
-      `📈 Tracked contribution for ${userAddress}: ${contributionAmount} BTC`
-    );
+   
 
-    // For now, we'll track this in the database and create a mechanism for users to sync manually
     // Store the contribution data that can be used for manual syncing
 
     return NextResponse.json({

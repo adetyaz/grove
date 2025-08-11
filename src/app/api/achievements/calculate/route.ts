@@ -83,13 +83,15 @@ export async function POST(request: NextRequest) {
     const currentStreak = user?.currentStreak || 0;
     const longestStreak = user?.longestStreak || 0;
 
-    // Get user's invitation count
-    const invitationCount = await prisma.circleInvitation.count({
-      where: {
-        inviterEmail: `${userAddress}@test.com`, // Using proper email format for test invitations
-        status: "ACCEPTED", // Use uppercase to match schema
-      },
-    });
+
+    const invitationCount = user?.email
+      ? await prisma.circleInvitation.count({
+          where: {
+            inviterEmail: user.email,
+            status: "ACCEPTED",
+          },
+        })
+      : 0;
 
     // Get existing achievements to avoid duplicates
     const existingAchievements = await prisma.userActivity.findMany({
@@ -236,10 +238,10 @@ export async function POST(request: NextRequest) {
       invitationCount,
       achievementsEarned: achievements.length,
       achievements,
-      claimableAchievements: achievements.map((a) => a.id), // For contract claiming
+      claimableAchievements: achievements.map((a) => a.id),
     };
 
-    console.log(`🎉 Achievement response:`, response);
+    
 
     return NextResponse.json(response);
   } catch (error) {

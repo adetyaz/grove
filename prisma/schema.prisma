@@ -37,21 +37,21 @@ model Circle {
   id            String   @id @default(uuid()) // UUID primary key
   name          String
   description   String?
-  targetAmount  String   // Stored as string to handle bigint
-  paymentType   String   // "ONETIME" or "RECURRING"
-  fixedAmount   String?  // Stored as string to handle bigint
-  frequency     String?  // "DAILY", "WEEKLY", "MONTHLY" (for recurring circles)
+  targetAmount  String   
+  paymentType   String 
+  fixedAmount   String?  
+  frequency     String?  
   deadline      DateTime
   transactionHash String?
   owner         User     @relation("CircleOwner", fields: [ownerId], references: [id])
   ownerId       String
   members       User[]   @relation("CircleMembers")
-  invites       Invite[] // Legacy invites
-  invitations   CircleInvitation[] // New invitation system
-  paymentSchedules PaymentSchedule[] // Recurring payment schedules
-  onChainId     Int?     @unique // Maps to contract's circleId (unique)
-  contractAddress String? // Which Grove contract this circle belongs to
-  syncStatus    String   @default("PENDING") // "PENDING", "SYNCED", "FAILED"
+  invites       Invite[]
+  invitations   CircleInvitation[]
+  paymentSchedules PaymentSchedule[]
+  onChainId     Int?     @unique
+  contractAddress String?
+  syncStatus    String   @default("PENDING") 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -59,7 +59,7 @@ model Circle {
 model Invite {
   id        String   @id @default(uuid())
   circle    Circle   @relation(fields: [circleId], references: [id])
-  circleId  String   // Changed from Int to String to match Circle.id
+  circleId  String   
   email     String
   token     String   @unique
   expiresAt DateTime
@@ -68,13 +68,13 @@ model Invite {
 
 model CircleInvitation {
   id                      String   @id @default(uuid())
-  circleId                String   // Changed from Int to String to match Circle.id
+  circleId                String  
   circle                  Circle   @relation(fields: [circleId], references: [id])
   inviterEmail            String
-  inviteeEmail            String?  // For email invitations
-  inviteeWalletAddress    String?  // For direct wallet invitations
-  inviteType              String   // "EMAIL" or "WALLET"
-  status                  String   @default("PENDING") // "PENDING", "ACCEPTED", "DECLINED", "EXPIRED"
+  inviteeEmail            String?  
+  inviteeWalletAddress    String?  
+  inviteType              String   
+  status                  String   @default("PENDING")
   expiresAt               DateTime
   createdAt               DateTime @default(now())
   acceptedAt              DateTime?
@@ -89,9 +89,9 @@ model CircleInvitation {
 model UserActivity {
   id          String   @id @default(uuid())
   userAddress String
-  type        String   // ActivityType enum values
+  type        String 
   description String?
-  metadata    String?  // JSON string for flexible data storage
+  metadata    String?
   timestamp   DateTime @default(now())
   
   @@index([userAddress])
@@ -104,13 +104,15 @@ model PaymentSchedule {
   userAddress     String
   circleId        String
   circle          Circle   @relation(fields: [circleId], references: [id])
-  amount          String   // Amount in wei/satoshis as string
-  frequency       String   // "DAILY", "WEEKLY", "MONTHLY"
+  amount          String
+  frequency       String
   nextPaymentDate DateTime
   lastPaymentDate DateTime?
   isActive        Boolean  @default(true)
   totalPayments   Int      @default(0)
-  maxPayments     Int?     // Optional limit on number of payments
+  maxPayments     Int?    
+  suspendedUntil  DateTime? 
+  terminatedAt    DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   
@@ -128,11 +130,11 @@ model RecurringPayment {
   schedule          PaymentSchedule @relation(fields: [scheduleId], references: [id])
   userAddress       String
   circleId          String
-  amount            String          // Amount in wei/satoshis as string
-  status            String          // "PENDING", "PROCESSING", "COMPLETED", "FAILED"
+  amount            String         
+  status            String         
   transactionHash   String?
-  scheduledFor      DateTime        // When this payment was scheduled to execute
-  processedAt       DateTime?       // When the payment was actually processed
+  scheduledFor      DateTime       
+  processedAt       DateTime?       
   failureReason     String?
   retryCount        Int             @default(0)
   createdAt         DateTime        @default(now())
@@ -154,24 +156,24 @@ model StreakData {
   @@index([userAddress])
 }
 
-// PHASE 1: Email Claim System - NEW TABLE (Non-disruptive)
+
 model GiftClaimInvite {
   id               String   @id @default(uuid())
-  giftId           String   // References the gift transaction hash or event
+  giftId           String   
   recipientEmail   String
   senderAddress    String
   senderName       String?
   circleId         String
   circleName       String
-  amount           String   // Gift amount as string (for bigint)
+  amount           String   
   message          String?
-  occasion         String?  // Birthday, wedding, etc.
-  claimToken       String   @unique // Secure claim token
+  occasion         String? 
+  claimToken       String   @unique 
   emailSent        Boolean  @default(false)
   emailSentAt      DateTime?
   claimedAt        DateTime?
-  claimedByAddress String?  // Address that claimed the gift
-  expiresAt        DateTime // Token expiration (48 hours)
+  claimedByAddress String?  
+  expiresAt        DateTime 
   createdAt        DateTime @default(now())
   
   @@index([recipientEmail])
@@ -179,4 +181,114 @@ model GiftClaimInvite {
   @@index([senderAddress])
   @@index([circleId])
   @@index([expiresAt])
+}
+
+// PUNISHMENT SYSTEM TABLES
+model UserViolation {
+  id          String   @id @default(uuid())
+  userAddress String
+  circleId    String
+  type        String  
+  description String?
+  metadata    String? 
+  createdAt   DateTime @default(now())
+  
+  punishments UserPunishment[]
+  
+  @@index([userAddress])
+  @@index([circleId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model UserPunishment {
+  id           String        @id @default(uuid())
+  userAddress  String
+  circleId     String
+  violationId  String
+  violation    UserViolation @relation(fields: [violationId], references: [id])
+  type         String
+  severity     Int
+  description  String
+  status       String        @default("ACTIVE") 
+  appliedAt    DateTime      @default(now())
+  expiresAt    DateTime?     
+  fineAmount   String?       
+  appealAllowed Boolean      @default(true)
+  
+  appeals PunishmentAppeal[]
+  
+  @@index([userAddress])
+  @@index([circleId])
+  @@index([status])
+  @@index([type])
+}
+
+model PunishmentAppeal {
+  id           String         @id @default(uuid())
+  userAddress  String
+  punishmentId String
+  punishment   UserPunishment @relation(fields: [punishmentId], references: [id])
+  circleId     String
+  reason       String
+  evidence     String?
+  status       String         @default("PENDING") 
+  submittedAt  DateTime       @default(now())
+  reviewedAt   DateTime?
+  reviewedBy   String?        
+  reviewNotes  String?
+  
+  @@index([userAddress])
+  @@index([punishmentId])
+  @@index([status])
+}
+
+model PunishmentApproval {
+  id             String   @id @default(uuid())
+  userAddress    String
+  circleId       String
+  violationId    String
+  punishmentType String
+  severity       Int
+  description    String
+  status         String   @default("PENDING") 
+  queuedAt       DateTime @default(now())
+  reviewedAt     DateTime?
+  reviewedBy     String?
+  appealAllowed  Boolean  @default(true)
+  metadata       String? 
+  
+  @@index([userAddress])
+  @@index([status])
+  @@index([queuedAt])
+}
+
+model UserSuspension {
+  id          String    @id @default(uuid())
+  userAddress String
+  circleId    String
+  reason      String
+  suspendedAt DateTime  @default(now())
+  expiresAt   DateTime
+  liftedAt    DateTime?
+  isActive    Boolean   @default(true)
+  
+  @@index([userAddress])
+  @@index([circleId])
+  @@index([isActive])
+  @@index([expiresAt])
+}
+
+model ContributionHold {
+  id          String    @id @default(uuid())
+  userAddress String
+  circleId    String
+  reason      String
+  createdAt   DateTime  @default(now())
+  releasedAt  DateTime?
+  isActive    Boolean   @default(true)
+  
+  @@index([userAddress])
+  @@index([circleId])
+  @@index([isActive])
 }

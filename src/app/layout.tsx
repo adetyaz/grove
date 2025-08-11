@@ -7,6 +7,11 @@ import DynamicErrorBoundary from "@/components/dynamic-error-boundary";
 // import PerformanceMonitor from "@/components/performance-monitor";
 import { ToastContainer } from "react-toastify";
 
+// Disable Prisma debug logs globally
+if (typeof globalThis !== "undefined") {
+  (globalThis as any).DEBUG = "";
+}
+
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
   variable: "--font-geist-sans",

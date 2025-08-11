@@ -39,18 +39,11 @@ export async function GET(
       } catch (error: any) {
         if (error.name === "TransactionReceiptNotFoundError") {
           if (attempts < maxAttempts) {
-            const delay = baseDelay * Math.pow(1.5, attempts - 1); // Exponential backoff
-            console.log(
-              `⏳ Transaction not mined yet, waiting ${delay}ms before retry ${
-                attempts + 1
-              }/${maxAttempts}`
-            );
+            const delay = baseDelay * Math.pow(1.5, attempts - 1);
+
             await new Promise((resolve) => setTimeout(resolve, delay));
             continue;
           } else {
-            console.log(
-              `❌ Transaction still not mined after ${maxAttempts} attempts`
-            );
             return Response.json(
               {
                 error: "Transaction not yet mined",
@@ -79,25 +72,12 @@ export async function GET(
       );
     }
 
-    console.log(`📄 Transaction receipt for ${hash}:`, {
-      status: receipt.status,
-      blockNumber: receipt.blockNumber.toString(),
-      logsCount: receipt.logs?.length || 0,
-    });
-
     // Filter logs from Grove contract only
     const groveLogs =
       receipt.logs?.filter(
         (log) =>
           log.address.toLowerCase() === GROVE_CONTRACT_ADDRESS.toLowerCase()
       ) || [];
-
-    console.log(`🏠 Grove contract logs:`, {
-      groveContractAddress: GROVE_CONTRACT_ADDRESS,
-      totalLogs: receipt.logs?.length || 0,
-      groveLogsCount: groveLogs.length,
-      allLogAddresses: receipt.logs?.map((log) => log.address) || [],
-    });
 
     // Parse CircleCreated event logs
     let circleId = undefined;
@@ -111,27 +91,10 @@ export async function GET(
       // Get the event selector (topic0) for CircleCreated
       const circleCreatedSelector = getEventSelector(circleCreatedEvent);
 
-      console.log(`🔍 Event signature info:`, {
-        expectedSelector: circleCreatedSelector,
-        contractSignature:
-          "CircleCreated(uint circleId, address owner, string name)",
-      });
-
       for (const log of groveLogs) {
-        // Only process Grove contract logs
-        console.log(`🔍 Processing Grove log:`, {
-          address: log.address,
-          topic0: log.topics[0],
-          expectedTopic0: circleCreatedSelector,
-          topicsMatch: log.topics[0] === circleCreatedSelector,
-          topics: log.topics,
-          data: log.data,
-        });
         try {
           // Check if this log matches our CircleCreated event
           if (log.topics[0] === circleCreatedSelector) {
-            console.log(`🎯 Found CircleCreated event in log:`, log);
-
             // Decode the event log
             const decodedLog = decodeEventLog({
               abi: [circleCreatedEvent],
@@ -139,17 +102,14 @@ export async function GET(
               topics: log.topics,
             });
 
-            console.log(`📝 Decoded event:`, decodedLog);
-
             // Extract circle ID from decoded args
             if (decodedLog.eventName === "CircleCreated" && decodedLog.args) {
               circleId = Number(decodedLog.args.circleId);
-              console.log(`✅ Extracted circleId: ${circleId}`);
+
               break;
             }
           }
         } catch (error) {
-          console.log(`❌ Error parsing log:`, error);
           // Continue to next log if parsing fails
           continue;
         }
@@ -158,10 +118,6 @@ export async function GET(
 
     // If we have a databaseCircleId, sync it with the contract
     if (databaseCircleId && circleId) {
-      console.log(
-        `🔄 Auto-syncing circle ${databaseCircleId} with onChainId ${circleId}`
-      );
-
       try {
         // Simple direct sync - just update the onChainId in the database
         const updatedCircle = await prisma.circle.update({
@@ -172,23 +128,11 @@ export async function GET(
             transactionHash: hash,
           },
         });
-
-        console.log(`✅ Successfully synced circle:`, {
-          id: updatedCircle.id,
-          onChainId: updatedCircle.onChainId,
-          syncStatus: updatedCircle.syncStatus,
-        });
       } catch (syncError) {
-        console.error(`❌ Error syncing circle:`, syncError);
+        console.error(`Error syncing circle:`, syncError);
       }
     } else {
-      console.log(`⚠️ Sync skipped:`, {
-        databaseCircleId,
-        circleId,
-        reason: !databaseCircleId
-          ? "No databaseCircleId"
-          : "No circleId found in logs",
-      });
+      console.log(`Sync skipped:`);
     }
 
     return Response.json({

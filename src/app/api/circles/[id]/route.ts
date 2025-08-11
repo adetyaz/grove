@@ -2,6 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { groveContract } from "@/lib/grove-contract";
 
+// Utility function to parse circle description that might be JSON
+const parseCircleDescription = (description: string | null): string => {
+  if (!description) return "";
+
+  try {
+    const parsed = JSON.parse(description);
+    // If it's our JSON format, return just the description part
+    if (typeof parsed === "object" && parsed.description !== undefined) {
+      return parsed.description || "";
+    }
+    // If JSON parsing worked but it's not our format, return the original
+    return description;
+  } catch {
+    // If JSON parsing fails, it's a plain string description
+    return description;
+  }
+};
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -59,10 +77,13 @@ export async function GET(
       id: circle.id,
       onChainId: circle.onChainId,
       name: circle.name,
-      description: circle.description,
+      description: parseCircleDescription(circle.description),
       targetAmount: circle.targetAmount,
       currentAmount,
       deadline: Math.floor(new Date(circle.deadline).getTime() / 1000),
+      paymentType: circle.paymentType,
+      frequency: circle.frequency,
+      fixedAmount: circle.fixedAmount,
       isActive: circle.syncStatus === "SYNCED",
       syncStatus: circle.syncStatus,
       memberCount: circle.members.length + 1,

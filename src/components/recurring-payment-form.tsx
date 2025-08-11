@@ -177,7 +177,7 @@ export default function RecurringPaymentForm({
 
   return (
     <div className='fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50'>
-      <div className='bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 max-w-2xl w-full max-h-[90vh] overflow-y-auto'>
+      <div className='bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 max-w-2xl w-full h-fit max-h-[85vh] flex flex-col'>
         <div className='text-center mb-6'>
           <div className='w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-700 rounded-full flex items-center justify-center mx-auto mb-4'>
             <span className='text-2xl'>🔄</span>

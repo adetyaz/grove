@@ -11,6 +11,8 @@ import ContributeForm from "@/components/contribute-form";
 import ContributionHistory from "@/components/contribution-history";
 import GiftForm from "@/components/gift-form";
 import GiftHistory from "@/components/gift-history";
+import CircleClaimForm from "@/components/circle-claim-form";
+import VoteProgressTracker from "@/components/vote-progress-tracker";
 import { groveToast } from "@/lib/toast";
 import {
   ArrowLeft,
@@ -45,6 +47,12 @@ interface CircleData {
   paymentType: string;
   fixedAmount?: bigint;
   createdAt: string;
+  owner?: {
+    id: string;
+    email: string;
+    name: string | null;
+    wallet: string;
+  };
   contributions?: {
     id: string;
     amount: bigint;
@@ -65,6 +73,7 @@ export default function CircleDetailPage() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showContributeModal, setShowContributeModal] = useState(false);
   const [showGiftModal, setShowGiftModal] = useState(false);
+  const [showClaimModal, setShowClaimModal] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "overview" | "members" | "activity" | "gifts"
   >("overview");
@@ -143,8 +152,20 @@ export default function CircleDetailPage() {
   const formatDeadline = (deadline: bigint | string) => {
     let ts =
       typeof deadline === "string" ? parseInt(deadline) : Number(deadline);
+
+    // Handle no deadline case (0 means no deadline for recurring circles)
+    if (ts === 0) {
+      return "No deadline";
+    }
+
     if (ts > 1e12) ts = Math.floor(ts / 1000);
     const date = new Date(ts * 1000);
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return "Invalid Date";
+    }
+
     return date.toLocaleDateString(undefined, {
       year: "numeric",
       month: "short",
@@ -221,9 +242,9 @@ export default function CircleDetailPage() {
                 variant='outline'
                 size='sm'
                 onClick={handleShare}
-                className='border-white/20 text-white hover:bg-white/10 transition-all duration-300'
+                className='border-white/20 text-black hover:bg-white/10 transition-all duration-300'
               >
-                <Share className='w-4 h-4 mr-2' />
+                <Share className='w-4 h-4 mr-2' color='black' />
                 Share
               </Button>
               <WalletButton variant='ghost' className='text-white' />
@@ -276,7 +297,7 @@ export default function CircleDetailPage() {
                     size='icon'
                     className='border-white/20 text-white hover:bg-white/10 transition-all duration-300'
                   >
-                    <Settings className='w-4 h-4' />
+                    <Settings className='w-4 h-4' color='black' />
                   </Button>
                 )}
               </div>
@@ -359,15 +380,30 @@ export default function CircleDetailPage() {
                   <Wallet className='w-4 h-4 mr-2' />
                   Contribute
                 </Button>
-                <Button
-                  onClick={() => setShowGiftModal(true)}
-                  variant='outline'
-                  className='w-full border-pink-500 text-pink-400 hover:bg-pink-500 hover:text-white transition-all duration-300'
-                  disabled={!circle.isActive}
-                >
-                  <Gift className='w-4 h-4 mr-2' />
-                  Send Gift
-                </Button>
+
+                {/* Show different buttons based on payment type */}
+                {circle.paymentType === "RECURRING" ? (
+                  <Button
+                    onClick={() => setShowClaimModal(true)}
+                    variant='outline'
+                    className='w-full border-green-500 text-green-400 hover:bg-green-500 hover:text-white transition-all duration-300'
+                    disabled={!circle.isActive}
+                  >
+                    <Award className='w-4 h-4 mr-2' />
+                    Start Vote to Claim
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => setShowGiftModal(true)}
+                    variant='outline'
+                    className='w-full border-pink-500 text-pink-400 hover:bg-pink-500 hover:text-white transition-all duration-300'
+                    disabled={!circle.isActive}
+                  >
+                    <Gift className='w-4 h-4 mr-2' />
+                    Send Gift
+                  </Button>
+                )}
+
                 <Button
                   onClick={() => setShowInviteModal(true)}
                   variant='outline'
@@ -434,90 +470,108 @@ export default function CircleDetailPage() {
 
           {/* Tab Content */}
           {activeTab === "overview" && (
-            <Card className='bg-white/10 backdrop-blur-sm border-white/20 animate-fade-in'>
-              <CardContent className='p-6'>
-                <div className='grid md:grid-cols-2 gap-6'>
-                  <div>
-                    <h3 className='text-lg font-semibold text-white mb-4'>
-                      Circle Information
-                    </h3>
-                    <div className='space-y-3'>
-                      <div className='flex justify-between'>
-                        <span className='text-gray-400'>Created:</span>
-                        <span className='text-white'>
-                          {new Date(circle.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <div className='flex justify-between'>
-                        <span className='text-gray-400'>Payment Type:</span>
-                        <span className='text-white'>
-                          {circle.paymentType === "RECURRING"
-                            ? "Recurring"
-                            : "One-time"}
-                        </span>
-                      </div>
-                      {circle.fixedAmount && (
+            <div>
+              <Card className='bg-white/10 backdrop-blur-sm border-white/20 animate-fade-in mb-8'>
+                <CardContent className='p-6'>
+                  <div className='grid md:grid-cols-2 gap-6'>
+                    <div>
+                      <h3 className='text-lg font-semibold text-white mb-4'>
+                        Circle Information
+                      </h3>
+                      <div className='space-y-3'>
                         <div className='flex justify-between'>
-                          <span className='text-gray-400'>Fixed Amount:</span>
+                          <span className='text-gray-400'>Created:</span>
                           <span className='text-white'>
-                            {formatBTCAmount(circle.fixedAmount)}
+                            {new Date(circle.createdAt).toLocaleDateString()}
                           </span>
                         </div>
-                      )}
-                      <div className='flex justify-between'>
-                        <span className='text-gray-400'>Creator:</span>
-                        <span className='text-white font-mono text-sm'>
-                          {circle.creator === address
-                            ? "You"
-                            : `${circle.creator.slice(
-                                0,
-                                6
-                              )}...${circle.creator.slice(-4)}`}
-                        </span>
+                        <div className='flex justify-between'>
+                          <span className='text-gray-400'>Payment Type:</span>
+                          <span className='text-white'>
+                            {circle.paymentType === "RECURRING"
+                              ? "Recurring"
+                              : "One-time"}
+                          </span>
+                        </div>
+                        {circle.fixedAmount && (
+                          <div className='flex justify-between'>
+                            <span className='text-gray-400'>Fixed Amount:</span>
+                            <span className='text-white'>
+                              {formatBTCAmount(circle.fixedAmount)}
+                            </span>
+                          </div>
+                        )}
+                        <div className='flex justify-between'>
+                          <span className='text-gray-400'>Creator:</span>
+                          <span className='text-white font-mono text-sm'>
+                            {circle.creator === address
+                              ? "You"
+                              : `${circle.creator.slice(
+                                  0,
+                                  6
+                                )}...${circle.creator.slice(-4)}`}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className='text-lg font-semibold text-white mb-4'>
+                        Progress Details
+                      </h3>
+                      <div className='space-y-3'>
+                        <div className='flex justify-between'>
+                          <span className='text-gray-400'>Target Amount:</span>
+                          <span className='text-white'>
+                            {formatBTCAmount(circle.targetAmount)}
+                          </span>
+                        </div>
+                        <div className='flex justify-between'>
+                          <span className='text-gray-400'>Current Amount:</span>
+                          <span className='text-white'>
+                            {formatBTCAmount(circle.currentAmount)}
+                          </span>
+                        </div>
+                        <div className='flex justify-between'>
+                          <span className='text-gray-400'>Remaining:</span>
+                          <span className='text-white'>
+                            {formatBTCAmount(
+                              (typeof circle.targetAmount === "string"
+                                ? BigInt(circle.targetAmount)
+                                : circle.targetAmount) -
+                                (typeof circle.currentAmount === "string"
+                                  ? BigInt(circle.currentAmount)
+                                  : circle.currentAmount)
+                            )}
+                          </span>
+                        </div>
+                        <div className='flex justify-between'>
+                          <span className='text-gray-400'>Progress:</span>
+                          <span className='text-green-400 font-semibold'>
+                            {progress.toFixed(1)}%
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <div>
-                    <h3 className='text-lg font-semibold text-white mb-4'>
-                      Progress Details
-                    </h3>
-                    <div className='space-y-3'>
-                      <div className='flex justify-between'>
-                        <span className='text-gray-400'>Target Amount:</span>
-                        <span className='text-white'>
-                          {formatBTCAmount(circle.targetAmount)}
-                        </span>
-                      </div>
-                      <div className='flex justify-between'>
-                        <span className='text-gray-400'>Current Amount:</span>
-                        <span className='text-white'>
-                          {formatBTCAmount(circle.currentAmount)}
-                        </span>
-                      </div>
-                      <div className='flex justify-between'>
-                        <span className='text-gray-400'>Remaining:</span>
-                        <span className='text-white'>
-                          {formatBTCAmount(
-                            (typeof circle.targetAmount === "string"
-                              ? BigInt(circle.targetAmount)
-                              : circle.targetAmount) -
-                              (typeof circle.currentAmount === "string"
-                                ? BigInt(circle.currentAmount)
-                                : circle.currentAmount)
-                          )}
-                        </span>
-                      </div>
-                      <div className='flex justify-between'>
-                        <span className='text-gray-400'>Progress:</span>
-                        <span className='text-green-400 font-semibold'>
-                          {progress.toFixed(1)}%
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              {/* Vote Progress Tracker - Only show for recurring circles */}
+              {circle.paymentType === "RECURRING" && (
+                <VoteProgressTracker
+                  circleId={circle.id}
+                  isOwner={
+                    circle.owner?.wallet.toLowerCase() ===
+                      address?.toLowerCase() ||
+                    circle.creator.toLowerCase() === address?.toLowerCase()
+                  }
+                  onVoteUpdate={() => {
+                    // Refresh circle data when votes are updated
+                    window.location.reload();
+                  }}
+                />
+              )}
+            </div>
           )}
 
           {activeTab === "members" && (
@@ -632,10 +686,28 @@ export default function CircleDetailPage() {
         <GiftForm
           circleId={circle.onChainId}
           circleName={circle.name}
+          contributionAmount={(Number(circle.currentAmount) / 1e18).toString()}
           onClose={() => setShowGiftModal(false)}
           onSuccess={() => {
             setShowGiftModal(false);
+            window.location.reload();
+          }}
+        />
+      )}
 
+      {showClaimModal && (
+        <CircleClaimForm
+          circleId={circle.id}
+          onChainId={circle.onChainId}
+          circleName={circle.name}
+          currentAmount={circle.currentAmount.toString()}
+          targetAmount={circle.targetAmount.toString()}
+          deadline={circle.deadline.toString()}
+          paymentType={circle.paymentType}
+          isOwner={isCreator}
+          onClose={() => setShowClaimModal(false)}
+          onSuccess={() => {
+            setShowClaimModal(false);
             window.location.reload();
           }}
         />

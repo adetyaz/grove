@@ -1,20 +1,16 @@
 "use client";
 import { useWriteContract } from "wagmi";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
-import {
-  GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
-  GROVE_ACHIEVEMENTS_ABI,
-} from "@/contracts/constants";
 import { groveToast } from "@/lib/toast";
 import { useCallback } from "react";
+import { achievementNFTContract } from "@/lib/achievementnft-contract";
 
 export function useAchievementClaiming() {
   const { primaryWallet } = useDynamicConnection();
   const address = primaryWallet?.address;
-  const { writeContractAsync } = useWriteContract();
 
   const claimAchievement = useCallback(
-    async (achievementId: number, testMode = false) => {
+    async (achievementId: number) => {
       if (!address) {
         throw new Error("Wallet not connected");
       }
@@ -22,48 +18,11 @@ export function useAchievementClaiming() {
       try {
         console.log(`🏆 Claiming achievement ${achievementId}...`);
 
-        // For test mode, try calling awardAchievement directly on the AchievementNFT contract
-        if (testMode) {
-          try {
-            const txHash = await writeContractAsync({
-              address: "0x785453Ec2bbbe87b5E5D19f91c810Be0D4704A14", // AchievementNFT contract
-              abi: [
-                {
-                  inputs: [
-                    { name: "to", type: "address" },
-                    { name: "achievementId", type: "uint256" },
-                  ],
-                  name: "mintAchievement",
-                  outputs: [],
-                  stateMutability: "nonpayable",
-                  type: "function",
-                },
-              ],
-              functionName: "mintAchievement",
-              args: [address as `0x${string}`, BigInt(achievementId)],
-            });
-
-            groveToast.success(
-              `🧪 Test NFT minted directly! Transaction: ${txHash.slice(
-                0,
-                6
-              )}...${txHash.slice(-4)}`,
-              { autoClose: 8000 }
-            );
-
-            return txHash;
-          } catch (testError: any) {
-            console.log("Direct NFT minting failed:", testError.message);
-            // Fall through to regular claim method
-          }
-        }
-
-        const txHash = await writeContractAsync({
-          address: GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
-          abi: GROVE_ACHIEVEMENTS_ABI,
-          functionName: "claimAchievement",
-          args: [BigInt(achievementId)],
-        });
+        // Use the AchievementNFT contract service
+        const txHash = await achievementNFTContract.claimAchievement(
+          achievementId,
+          address as `0x${string}`
+        );
 
         groveToast.success(
           `🎉 Achievement NFT claimed! Transaction: ${txHash.slice(
@@ -93,11 +52,11 @@ export function useAchievementClaiming() {
         }
       }
     },
-    [address, writeContractAsync]
+    [address]
   );
 
   const claimMultipleAchievements = useCallback(
-    async (achievementIds: number[], testMode = false) => {
+    async (achievementIds: number[]) => {
       if (!address) {
         throw new Error("Wallet not connected");
       }
@@ -108,7 +67,7 @@ export function useAchievementClaiming() {
 
       for (const achievementId of achievementIds) {
         try {
-          const txHash = await claimAchievement(achievementId, testMode);
+          const txHash = await claimAchievement(achievementId);
           results.push({ achievementId, success: true, txHash });
           succeeded++;
 

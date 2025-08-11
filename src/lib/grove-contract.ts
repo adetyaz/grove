@@ -241,6 +241,23 @@ export class GroveContractService {
   }
 
   /**
+   * Execute a withdrawal from a circle (circle owner only)
+   * @param params { circleId: number, amount: bigint }
+   * @param account {Address}
+   */
+  async withdraw(
+    params: { circleId: number; amount: bigint },
+    account: Address
+  ) {
+    const walletClient = await import("@/lib/clients").then((m) =>
+      m.getWalletClient()
+    );
+
+    const { request } = await this.simulateWithdraw(params, account);
+    return await walletClient.writeContract(request);
+  }
+
+  /**
    * Simulate sending a gift within a circle
    * @param params { circleId: number, recipient: string, amount: bigint }
    * @param account {Address}
@@ -288,3 +305,6 @@ export function formatDeadline(deadline: bigint): string {
   const deadlineMs = Number(deadline) * 1000;
   return new Date(deadlineMs).toLocaleDateString();
 }
+
+// Export service instance
+export const groveContractService = new GroveContractService();

@@ -124,6 +124,31 @@ export class GiftEngineContractService {
 
     const expirationDays = params.expirationDays || 30; // Default 30 days
 
+    console.log("Creating escrow gift with params:", {
+      circleId: params.circleId,
+      recipient: params.recipient,
+      message: params.message,
+      amount: params.amount.toString(),
+      expirationDays,
+      senderAddress,
+    });
+
+    // Check sender balance
+    const balance = await this.publicClient.getBalance({
+      address: senderAddress,
+    });
+
+    console.log("Sender balance:", formatEther(balance), "BTC");
+    console.log("Required amount:", formatEther(params.amount), "BTC");
+
+    if (balance < params.amount) {
+      throw new Error(
+        `Insufficient balance. You have ${formatEther(
+          balance
+        )} BTC but need ${formatEther(params.amount)} BTC`
+      );
+    }
+
     // First simulate the transaction
     const { request } = await this.publicClient.simulateContract({
       address: GIFTENGINE_CONTRACT_ADDRESS,
@@ -172,7 +197,7 @@ export class GiftEngineContractService {
   }
 
   /**
-   * Claim an escrow gift
+   * Claim an escrow gift (client-side with wallet connection)
    */
   async claimEscrowGift(giftId: string, recipientAddress: Address) {
     if (typeof window === "undefined" || !window.ethereum) {
@@ -228,7 +253,7 @@ export class GiftEngineContractService {
         bigint
       ];
 
-      if (result[3] === 0n) return null; // No gift found (amount is 0)
+      if (result[3] === BigInt(0)) return null; // No gift found (amount is 0)
 
       return {
         circleId: Number(result[0]),

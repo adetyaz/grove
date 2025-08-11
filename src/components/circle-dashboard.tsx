@@ -1,20 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { UserPlus } from "lucide-react";
+import { useState, useEffect } from "react";
+import { UserPlus, Vote } from "lucide-react";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
+import { groveToast } from "@/lib/toast";
 import ContributeForm from "./contribute-form";
 import RecurringPaymentForm from "./recurring-payment-form";
 import InviteForm from "./invite-form";
 import InheritanceForm from "./inheritance-form";
 import InheritanceClaimForm from "./inheritance-claim-form";
 import CircleClaimForm from "./circle-claim-form";
-import GiftForm from "./gift-form";
-import {
-  formatBTCAmount,
-  calculateProgress,
-  formatDeadline,
-} from "@/lib/grove-contract";
+
+import { formatBTCAmount, calculateProgress } from "@/lib/grove-contract";
+import { formatDeadline } from "@/hooks/useDashboardData";
+import { votingModuleService } from "@/lib/voting-module-contract";
 
 export default function CircleDashboard({
   dashboardData,
@@ -68,9 +67,8 @@ export default function CircleDashboard({
   const [claimModal, setClaimModal] = useState<{
     isOpen: boolean;
     circleId: number;
-    maxAmount: bigint;
-    receiver: string;
-  }>({ isOpen: false, circleId: 0, maxAmount: BigInt(0), receiver: "" });
+    deceasedAddress: string;
+  }>({ isOpen: false, circleId: 0, deceasedAddress: "" });
 
   const [circleClaimModal, setCircleClaimModal] = useState<{
     isOpen: boolean;
@@ -96,6 +94,180 @@ export default function CircleDashboard({
     circleName: string;
     availableAmount: string;
   }>({ isOpen: false, circleId: 0, circleName: "", availableAmount: "0" });
+
+  const [userSchedules, setUserSchedules] = useState<any[]>([]);
+  const [userContributions, setUserContributions] = useState<{
+    [key: string]: string;
+  }>({});
+  const [enablingVotingBulk, setEnablingVotingBulk] = useState(false);
+
+  // Get recurring circles without voting enabled
+  const recurringCirclesWithoutVoting =
+    dashboardData?.circles?.filter(
+      (circle: any) =>
+        circle.paymentType === "RECURRING" &&
+        circle.owner?.wallet?.toLowerCase() === userAddress?.toLowerCase()
+    ) || [];
+
+  // Function to enable voting for all recurring circles
+  const enableVotingForAllRecurringCircles = async () => {
+    if (!userAddress || recurringCirclesWithoutVoting.length === 0) return;
+
+    setEnablingVotingBulk(true);
+
+    try {
+      groveToast.info(
+        `Enabling voting for ${recurringCirclesWithoutVoting.length} recurring circles...`
+      );
+
+      let successCount = 0;
+      const failedCircles: string[] = [];
+
+      for (const circle of recurringCirclesWithoutVoting) {
+        if (!circle.onChainId) continue;
+
+        try {
+          // Check if voting is already enabled
+          try {
+            await votingModuleService.getCircleProposals(circle.onChainId);
+            console.log(
+              `✅ Voting already enabled for circle "${circle.name}"`
+            );
+            successCount++;
+            continue;
+          } catch (error: any) {
+            if (!error.message?.includes("Voting not enabled")) {
+              throw error; // Re-throw if it's not the expected "not enabled" error
+            }
+            // Continue to enable voting if it's not enabled
+          }
+
+          console.log(
+            `🗳️ Enabling voting for circle "${circle.name}" (ID: ${circle.onChainId})`
+          );
+
+          // Enable voting with delegation
+          await votingModuleService.enableVotingWithDelegation(
+            circle.onChainId,
+            userAddress as `0x${string}`
+          );
+
+          // Deposit escrow for voting operations
+          await votingModuleService.depositEscrow(
+            circle.onChainId,
+            "0.1", // 0.1 ETH
+            userAddress as `0x${string}`
+          );
+
+          successCount++;
+          console.log(`✅ Voting enabled for circle "${circle.name}"`);
+
+          // Small delay between transactions to avoid nonce issues
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        } catch (error: any) {
+          console.error(
+            `❌ Failed to enable voting for circle "${circle.name}":`,
+            error
+          );
+          failedCircles.push(circle.name);
+        }
+      }
+
+      if (successCount > 0) {
+        groveToast.success(
+          `✅ Voting enabled for ${successCount} recurring circle${
+            successCount > 1 ? "s" : ""
+          }!`
+        );
+      }
+
+      if (failedCircles.length > 0) {
+        groveToast.warning(
+          `⚠️ Failed to enable voting for: ${failedCircles.join(
+            ", "
+          )}. You can try enabling them individually.`
+        );
+      }
+
+      // Refresh the dashboard to update voting status
+      refresh();
+    } catch (error: any) {
+      console.error("Bulk voting enablement error:", error);
+      groveToast.error(`Failed to enable voting: ${error.message}`);
+    } finally {
+      setEnablingVotingBulk(false);
+    }
+  };
+
+  // Fetch user payment schedules
+  useEffect(() => {
+    const fetchUserSchedules = async () => {
+      if (!primaryWallet?.address) return;
+
+      try {
+        const response = await fetch(
+          `/api/payments/schedule?userAddress=${primaryWallet.address}`
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setUserSchedules(data.schedules || []);
+        }
+      } catch (error) {
+        console.error("Error fetching user schedules:", error);
+      }
+    };
+
+    fetchUserSchedules();
+  }, [primaryWallet?.address]);
+
+  // Fetch user's actual contributions for each circle
+  useEffect(() => {
+    const fetchUserContributions = async () => {
+      if (!primaryWallet?.address || !dashboardData?.circles) return;
+
+      const contributions: { [key: string]: string } = {};
+
+      for (const circle of dashboardData.circles) {
+        try {
+          const response = await fetch(
+            `/api/contributions/user?userAddress=${primaryWallet.address}&circleId=${circle.id}`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            contributions[circle.id] = data.totalContributed || "0";
+          }
+        } catch (error) {
+          console.error(
+            `Error fetching contributions for circle ${circle.id}:`,
+            error
+          );
+          contributions[circle.id] = "0";
+        }
+      }
+
+      setUserContributions(contributions);
+    };
+
+    fetchUserContributions();
+  }, [primaryWallet?.address, dashboardData?.circles]);
+
+  // Helper function to get user's ACTUAL contribution amount for a specific circle
+  const getUserContributionAmount = (circleId: string) => {
+    // Get the EXACT amount this user has contributed to this specific circle
+    const actualContribution = userContributions[circleId];
+    if (actualContribution && actualContribution !== "0") {
+      return actualContribution;
+    }
+
+    // If no actual contributions yet, fall back to scheduled amount
+    const schedule = userSchedules.find((s) => s.circleId === circleId);
+    if (schedule?.amount) {
+      return schedule.amount;
+    }
+
+    // Final fallback
+    return "100000"; // 0.001 BTC in satoshis
+  };
 
   if (!dashboardData || dashboardData.circles.length === 0) {
     return (
@@ -166,13 +338,35 @@ export default function CircleDashboard({
             {dashboardData.circles.length !== 1 ? "s" : ""} growing your wealth
           </p>
         </div>
-        <a
-          href='/create'
-          className='bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center'
-        >
-          <span className='mr-2'>🌱</span>
-          Plant New Circle
-        </a>
+        <div className='flex gap-3'>
+          {/* Bulk Voting Enablement Button - Only show if user has recurring circles */}
+          {recurringCirclesWithoutVoting.length > 0 && (
+            <button
+              onClick={enableVotingForAllRecurringCircles}
+              disabled={enablingVotingBulk}
+              className='bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-black px-4 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center text-sm'
+            >
+              {enablingVotingBulk ? (
+                <>
+                  <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2'></div>
+                  Enabling...
+                </>
+              ) : (
+                <>
+                  <Vote className='w-4 h-4 mr-2' />
+                  Enable Voting ({recurringCirclesWithoutVoting.length})
+                </>
+              )}
+            </button>
+          )}
+          <a
+            href='/create'
+            className='bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center'
+          >
+            <span className='mr-2'>🌱</span>
+            Plant New Circle
+          </a>
+        </div>
       </div>
 
       <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
@@ -181,7 +375,10 @@ export default function CircleDashboard({
             circle.currentAmount,
             circle.targetAmount
           );
-          const isExpired = Number(circle.deadline) * 1000 < Date.now();
+          // Handle expiry correctly - circles with deadline 0 (no deadline) are never expired
+          const deadlineTimestamp = Number(circle.deadline) * 1000;
+          const isExpired =
+            deadlineTimestamp > 0 && deadlineTimestamp < Date.now();
 
           return (
             <div
@@ -315,53 +512,75 @@ export default function CircleDashboard({
                     Set Inheritance
                   </button>
                   {/* Show different buttons based on circle type and status */}
-                  {(circle.currentAmount >= circle.targetAmount ||
-                    isExpired) && (
-                    <>
-                      {circle.paymentType === "ONETIME" ? (
-                        // For one-time circles: Send Gift (invite recipient)
-                        <button
-                          className='flex-1 bg-gradient-to-r from-pink-500/20 to-pink-600/20 border border-pink-500/30 text-pink-300 py-2 px-3 rounded-lg text-sm font-medium hover:from-pink-500/30 hover:to-pink-600/30 transition-all duration-200'
-                          onClick={() => {
-                            setGiftModal({
-                              isOpen: true,
-                              circleId: circle.id,
-                              circleName: circle.name,
-                              availableAmount: circle.currentAmount.toString(),
-                            });
-                          }}
-                        >
-                          🎁 Send Gift
-                        </button>
-                      ) : (
-                        // For recurring circles: Claim (trigger voting)
-                        <button
-                          className='flex-1 bg-gradient-to-r from-emerald-500/20 to-emerald-600/20 border border-emerald-500/30 text-emerald-300 py-2 px-3 rounded-lg text-sm font-medium hover:from-emerald-500/30 hover:to-emerald-600/30 transition-all duration-200'
-                          onClick={() => {
-                            setCircleClaimModal({
-                              isOpen: true,
-                              circleId: circle.id,
-                              circleName: circle.name,
-                              targetAmount: circle.targetAmount,
-                              currentAmount: circle.currentAmount,
-                              deadline: circle.deadline,
-                              owner: circle.owner,
-                            });
-                          }}
-                        >
-                          🗳️ Start Vote to Claim
-                        </button>
-                      )}
-                    </>
-                  )}
+                  {(() => {
+                    const isGoalReached =
+                      circle.currentAmount >= circle.targetAmount;
+                    const userContribution = getUserContributionAmount(
+                      circle.id
+                    );
+                    const hasUserContributed = parseFloat(userContribution) > 0;
+
+                    // For one-time circles: show buttons when goal reached OR expired
+                    // For recurring circles: show buttons when user has contributed OR goal reached OR expired
+                    const shouldShowButtons =
+                      circle.paymentType === "ONETIME"
+                        ? isGoalReached || isExpired
+                        : hasUserContributed || isGoalReached || isExpired;
+
+                    if (!shouldShowButtons) return null;
+
+                    return (
+                      <>
+                        {circle.paymentType === "ONETIME" ? (
+                          // For one-time circles: Send Gift (invite recipient)
+                          <button
+                            className='flex-1 bg-gradient-to-r from-pink-500/20 to-pink-600/20 border border-pink-500/30 text-pink-300 py-2 px-3 rounded-lg text-sm font-medium hover:from-pink-500/30 hover:to-pink-600/30 transition-all duration-200'
+                            onClick={() => {
+                              // Use the actual circle's current amount in BTC format
+                              const actualAmount = (
+                                Number(circle.currentAmount) / 1e18
+                              ).toString();
+                              setGiftModal({
+                                isOpen: true,
+                                circleId: circle.id,
+                                circleName: circle.name,
+                                availableAmount: actualAmount,
+                              });
+                            }}
+                          >
+                            🎁 Send Gift
+                          </button>
+                        ) : (
+                          // For recurring circles: Claim (trigger voting)
+                          <button
+                            className='flex-1 bg-gradient-to-r from-emerald-500/20 to-emerald-600/20 border border-emerald-500/30 text-emerald-300 py-2 px-3 rounded-lg text-sm font-medium hover:from-emerald-500/30 hover:to-emerald-600/30 transition-all duration-200'
+                            onClick={() => {
+                              setCircleClaimModal({
+                                isOpen: true,
+                                circleId: circle.id,
+                                circleName: circle.name,
+                                targetAmount: circle.targetAmount,
+                                currentAmount: circle.currentAmount,
+                                deadline: circle.deadline,
+                                owner: circle.owner,
+                              });
+                            }}
+                          >
+                            🗳️ Start Vote to Claim
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
                   <button
                     className='flex-1 bg-gradient-to-r from-yellow-500/20 to-yellow-600/20 border border-yellow-500/30 text-yellow-300 py-2 px-3 rounded-lg text-sm font-medium hover:from-yellow-500/30 hover:to-yellow-600/30 transition-all duration-200'
                     onClick={() => {
+                      // TODO: This should open a modal to select which deceased member's inheritance to claim
+                      // For now, this will need a deceased address to be provided
                       setClaimModal({
                         isOpen: true,
                         circleId: circle.id,
-                        maxAmount: circle.currentAmount,
-                        receiver: "",
+                        deceasedAddress: "", // This needs to be filled with actual deceased member address
                       });
                     }}
                   >
@@ -430,16 +649,14 @@ export default function CircleDashboard({
       {claimModal.isOpen && (
         <InheritanceClaimForm
           circleId={claimModal.circleId}
-          maxAmount={claimModal.maxAmount}
-          receiver={claimModal.receiver}
+          deceasedAddress={claimModal.deceasedAddress}
           onSuccess={() => {
             refresh();
             setTimeout(() => {
               setClaimModal({
                 isOpen: false,
                 circleId: 0,
-                maxAmount: BigInt(0),
-                receiver: "",
+                deceasedAddress: "",
               });
             }, 1500);
           }}
@@ -447,8 +664,7 @@ export default function CircleDashboard({
             setClaimModal({
               isOpen: false,
               circleId: 0,
-              maxAmount: BigInt(0),
-              receiver: "",
+              deceasedAddress: "",
             })
           }
         />
@@ -519,55 +735,6 @@ export default function CircleDashboard({
             setInviteModal({ isOpen: false, circleId: "", circleName: "" })
           }
         />
-      )}
-
-      {/* Gift Modal for One-time Circles */}
-      {giftModal.isOpen && (
-        <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'>
-          <div className='bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto'>
-            <div className='p-6'>
-              <div className='flex justify-between items-center mb-4'>
-                <h3 className='text-xl font-semibold'>Send Circle Gift</h3>
-                <button
-                  onClick={() =>
-                    setGiftModal({
-                      isOpen: false,
-                      circleId: 0,
-                      circleName: "",
-                      availableAmount: "0",
-                    })
-                  }
-                  className='text-gray-400 hover:text-gray-600 text-2xl font-bold'
-                >
-                  ×
-                </button>
-              </div>
-              <GiftForm
-                circleId={giftModal.circleId}
-                circleName={giftModal.circleName}
-                onSuccess={() => {
-                  refresh();
-                  setTimeout(() => {
-                    setGiftModal({
-                      isOpen: false,
-                      circleId: 0,
-                      circleName: "",
-                      availableAmount: "0",
-                    });
-                  }, 1500);
-                }}
-                onClose={() =>
-                  setGiftModal({
-                    isOpen: false,
-                    circleId: 0,
-                    circleName: "",
-                    availableAmount: "0",
-                  })
-                }
-              />
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

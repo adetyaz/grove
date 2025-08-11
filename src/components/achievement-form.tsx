@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { groveToast } from "@/lib/toast";
-import { groveContract } from "@/lib/grove-contract";
+import { achievementNFTContract } from "@/lib/achievementnft-contract";
 
 interface AchievementFormProps {
   circleId: number;
@@ -12,7 +12,7 @@ interface AchievementFormProps {
 }
 
 export default function AchievementForm({
-  circleId,
+  circleId: _circleId, // eslint-disable-line @typescript-eslint/no-unused-vars
   circleName,
   onSuccess,
   onClose,
@@ -38,24 +38,53 @@ export default function AchievementForm({
       setIsPending(true);
       setError(null);
       setIsConfirming(false);
-      // ...existing code...
-      // Simulate and send the achievement claim transaction
-      const simulation = await groveContract.simulateClaimAchievement(
-        { circleId, achievementId },
+
+      // Claim the achievement using the AchievementNFT contract
+      await achievementNFTContract.claimAchievement(
+        parseInt(achievementId),
         address as `0x${string}`
       );
-      const { request } = simulation;
-      const publicClient = (groveContract as any).publicClient;
-      const txHash = await publicClient.writeContract(request);
+
       setIsConfirming(true);
-      setTimeout(() => {
+
+      // Wait for confirmation and then offer Farcaster sharing
+      setTimeout(async () => {
         setIsConfirming(false);
         setIsPending(false);
         setIsLoading(false);
-        groveToast.success(`Achievement ${achievementId} claimed!`);
+
+        // Get achievement metadata and offer Farcaster sharing
+        try {
+          const achievement =
+            await achievementNFTContract.getAchievementMetadata(
+              parseInt(achievementId)
+            );
+          const farcasterUrl = achievementNFTContract.generateFarcasterShareUrl(
+            achievement,
+            address
+          );
+
+          // Show success message
+          groveToast.success(`🏅 Achievement "${achievement.name}" claimed!`);
+
+          // Show Farcaster sharing option after a brief delay
+          setTimeout(() => {
+            if (
+              window.confirm(
+                "🎉 Achievement claimed! Would you like to share this on Farcaster?"
+              )
+            ) {
+              window.open(farcasterUrl, "_blank");
+            }
+          }, 1000);
+        } catch (err) {
+          console.error("Failed to get achievement metadata:", err);
+          groveToast.success(`Achievement ${achievementId} claimed!`);
+        }
+
         onSuccess?.();
         onClose?.();
-      }, 5000);
+      }, 3000);
     } catch (err: any) {
       setError(err);
       setIsLoading(false);

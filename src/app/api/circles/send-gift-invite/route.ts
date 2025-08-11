@@ -46,8 +46,7 @@ export async function POST(request: NextRequest) {
 
     console.log("Gift invitation created:", giftInvitation);
 
-    // TODO: Integrate with Resend or email service
-    // Send email to recipient with gift claim link
+   
     const emailContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: linear-gradient(135deg, #ec4899, #f97316); padding: 40px; text-align: center; border-radius: 12px 12px 0 0;">

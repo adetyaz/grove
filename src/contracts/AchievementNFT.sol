@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 /**
  * @title AchievementNFT
@@ -35,6 +36,8 @@ contract AchievementNFT is ERC721URIStorage, Ownable {
     event AchievementRegistered(uint256 indexed achievementId, string name, string description);
 
     constructor() ERC721("GroveAchievement", "GROVEACH") Ownable(msg.sender) {
+        nextTokenId = 1; // Start token IDs from 1 instead of 0
+        
         // Pre-register the 6 achievement types expected by frontend
         _registerAchievement(0, "First Steps", "Made your first contribution to a savings circle", "FIRST");
         _registerAchievement(1, "Penny Saver", "Contributed 0.001 BTC total", "PENNY");
@@ -76,7 +79,9 @@ contract AchievementNFT is ERC721URIStorage, Ownable {
         require(achievements[achievementId].exists, "Achievement does not exist");
         require(!hasUserAchievement[to][achievementId], "User already has this achievement");
         
-        uint256 tokenId = nextTokenId++;
+        uint256 tokenId = nextTokenId;
+        nextTokenId++;
+        
         _mint(to, tokenId);
         _setTokenURI(tokenId, achievementURIs[achievementId]);
         
@@ -129,16 +134,16 @@ contract AchievementNFT is ERC721URIStorage, Ownable {
         uint256 achievementId,
         string memory name,
         string memory description,
-        string memory icon
+        string memory /* icon */
     ) internal pure returns (string memory) {
         // Create proper NFT metadata with image URIs
         string memory imageUri = _getAchievementImageUri(achievementId);
         
         return string(abi.encodePacked(
-            "{\"name\":\"", name, 
-            "\",\"description\":\"", description,
-            "\",\"image\":\"", imageUri,
-            "\",\"attributes\":[{\"trait_type\":\"Category\",\"value\":\"Grove Achievement\"},{\"trait_type\":\"Achievement_ID\",\"value\":\"", _toString(achievementId), "\"}]}"
+            '{"name":"', name, 
+            '","description":"', description,
+            '","image":"', imageUri,
+            '","attributes":[{"trait_type":"Category","value":"Grove Achievement"},{"trait_type":"Achievement_ID","value":"', _toString(achievementId), '"}]}'
         ));
     }
 
@@ -165,22 +170,30 @@ contract AchievementNFT is ERC721URIStorage, Ownable {
     }
 
     /**
-     * @dev Convert uint256 to string
+     * @dev Public function to allow users to claim achievements
+     * This allows users to self-mint achievements they've earned
+     */
+    function claimAchievement(uint256 achievementId) external {
+        require(achievements[achievementId].exists, "Achievement does not exist");
+        require(!hasUserAchievement[msg.sender][achievementId], "User already has this achievement");
+        
+        uint256 tokenId = nextTokenId;
+        nextTokenId++;
+        
+        _mint(msg.sender, tokenId);
+        _setTokenURI(tokenId, achievementURIs[achievementId]);
+        
+        // Track achievement for user
+        userAchievements[msg.sender].push(achievementId);
+        hasUserAchievement[msg.sender][achievementId] = true;
+        
+        emit AchievementMinted(msg.sender, achievementId, tokenId);
+    }
+
+    /**
+     * @dev Convert uint256 to string using OpenZeppelin's Strings library
      */
     function _toString(uint256 value) internal pure returns (string memory) {
-        if (value == 0) return "0";
-        uint256 temp = value;
-        uint256 digits;
-        while (temp != 0) {
-            digits++;
-            temp /= 10;
-        }
-        bytes memory buffer = new bytes(digits);
-        while (value != 0) {
-            digits -= 1;
-            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
-            value /= 10;
-        }
-        return string(buffer);
+        return Strings.toString(value);
     }
 }

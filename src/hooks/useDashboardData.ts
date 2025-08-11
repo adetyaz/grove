@@ -5,6 +5,24 @@ import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/contracts/constants";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { formatEther } from "viem";
 
+// Utility function to parse circle description that might be JSON
+const parseCircleDescription = (description: string | null): string => {
+  if (!description) return "";
+
+  try {
+    const parsed = JSON.parse(description);
+    // If it's our JSON format, return just the description part
+    if (typeof parsed === "object" && parsed.description !== undefined) {
+      return parsed.description || "";
+    }
+    // If JSON parsing worked but it's not our format, return the original
+    return description;
+  } catch {
+    // If JSON parsing fails, it's a plain string description
+    return description;
+  }
+};
+
 interface Circle {
   id: string;
   onChainId: number;
@@ -73,49 +91,82 @@ export function useDashboardData() {
 
       if (dbData.circles && dbData.circles.length > 0) {
         const dbCircles = await Promise.all(
-          dbData.circles.map(async (circle: any) => {
-            const targetAmount = BigInt(circle.targetAmount);
-            const deadline = BigInt(
-              Math.floor(new Date(circle.deadline).getTime() / 1000)
-            );
-            const memberWallets = circle.members.map((m: any) => m.wallet);
-            const allMembers = [circle.owner.wallet, ...memberWallets];
-
-            let currentAmount = BigInt(0);
+          dbData.circles.map(async (circle: any, index: number) => {
             try {
-              if (circle.onChainId) {
-                const onChain = await import("@/lib/grove-contract").then((m) =>
-                  m.groveContract.getCircle(circle.onChainId)
-                );
-                if (onChain && typeof onChain.currentAmount === "bigint") {
-                  currentAmount = onChain.currentAmount;
+              // Handle potential decimal values in targetAmount
+              let targetAmountBigInt: bigint;
+              try {
+                if (circle.targetAmount.includes(".")) {
+                  // Convert decimal to wei (multiply by 10^18)
+                  const decimalValue = parseFloat(circle.targetAmount);
+                  targetAmountBigInt = BigInt(Math.floor(decimalValue * 1e18));
+                } else {
+                  targetAmountBigInt = BigInt(circle.targetAmount);
                 }
+              } catch {
+                console.warn(
+                  `Invalid targetAmount for circle ${circle.id}:`,
+                  circle.targetAmount
+                );
+                targetAmountBigInt = BigInt(0);
               }
-            } catch {}
 
-            return {
-              id: circle.id,
-              onChainId: circle.onChainId,
-              name: circle.name,
-              description: circle.description,
-              targetAmount,
-              currentAmount,
-              deadline,
-              isActive: true,
-              memberCount: allMembers.length + circle.invitations.length,
-              members: allMembers,
-              creator: circle.owner.wallet,
-              paymentType: circle.paymentType,
-            };
+              const targetAmount = targetAmountBigInt;
+              const deadline = BigInt(
+                Math.floor(new Date(circle.deadline).getTime() / 1000)
+              );
+              const memberWallets = circle.members.map((m: any) => m.wallet);
+              const allMembers = [circle.owner.wallet, ...memberWallets];
+
+              let currentAmount = BigInt(0);
+              try {
+                if (circle.onChainId) {
+                  const onChain = await import("@/lib/grove-contract").then(
+                    (m) => m.groveContract.getCircle(circle.onChainId)
+                  );
+                  if (onChain && typeof onChain.currentAmount === "bigint") {
+                    currentAmount = onChain.currentAmount;
+                  }
+                }
+              } catch {
+                // On-chain data fetch failed, continue with zero amount
+              }
+
+              const processedCircle = {
+                id: circle.id,
+                onChainId: circle.onChainId,
+                name: circle.name,
+                description: parseCircleDescription(circle.description),
+                targetAmount,
+                currentAmount,
+                deadline,
+                isActive: true,
+                memberCount: allMembers.length + circle.invitations.length,
+                members: allMembers,
+                creator: circle.owner.wallet,
+                paymentType: circle.paymentType,
+              };
+
+              return processedCircle;
+            } catch (circleError) {
+              console.error(
+                `Failed to process circle ${index + 1}:`,
+                circleError
+              );
+              return null;
+            }
           })
         );
 
-        const totalCircles = dbCircles.length;
-        const totalSaved = dbCircles.reduce(
+        // Filter out any null entries (failed processing)
+        const validCircles = dbCircles.filter((circle) => circle !== null);
+
+        const totalCircles = validCircles.length;
+        const totalSaved = validCircles.reduce(
           (sum, circle) => sum + circle.currentAmount,
           BigInt(0)
         );
-        const goalsReached = dbCircles.filter(
+        const goalsReached = validCircles.filter(
           (circle) => circle.currentAmount >= circle.targetAmount
         ).length;
 
@@ -129,14 +180,14 @@ export function useDashboardData() {
           return Math.min(activeCircles.length, 7);
         };
 
-        const currentStreak = calculateStreak(dbCircles);
+        const currentStreak = calculateStreak(validCircles);
 
         setDashboardData({
           totalCircles,
           totalSaved,
           goalsReached,
           currentStreak,
-          circles: dbCircles,
+          circles: validCircles,
         });
       } else {
         setDashboardData({
@@ -237,6 +288,16 @@ export const calculateProgress = (current: bigint, target: bigint): number => {
 };
 
 export const formatDeadline = (deadline: bigint): string => {
+  // Handle no deadline case (0 means no deadline was set)
+  if (deadline === BigInt(0)) {
+    return "No deadline";
+  }
+
+  // Handle very large numbers that might indicate no deadline
+  if (deadline > BigInt(2147483647)) {
+    return "No deadline";
+  }
+
   const deadlineDate = new Date(Number(deadline) * 1000);
   const now = new Date();
   const diffTime = deadlineDate.getTime() - now.getTime();

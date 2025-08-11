@@ -4,16 +4,7 @@ pragma solidity ^0.8.20;
 /**
  * @title InheritanceModule
  * @notice Handles inheritance and beneficiary logic for Grove circles
- */
-
-// Interface for SatVault integration
-interface ISatVault {
-    function getMemberContributions(uint256 circleId, address member) external view returns (uint256);
-    function withdrawInheritance(uint256 circleId, address deceased, address beneficiary, uint256 amount) external;
-}
-/**
- * @dev Enhanced inheritance system: stores beneficiary data and handles actual inheritance claims.
- *      Integrates with SatVault for secure fund distribution.
+ * @dev Integrates with existing Grove/SatVault system
  */
 contract InheritanceModule {
     struct Beneficiary {
@@ -21,42 +12,48 @@ contract InheritanceModule {
         uint256 share;
     }
 
-    struct InheritanceClaim {
-        bool isActive;
-        uint256 activatedAt;
-        uint256 totalAmount;
-        mapping(address => bool) hasClaimed;
-    }
-
-    // circleId => owner => beneficiaries
+    // circleId => owner => beneficiaries (existing functionality)
     mapping(uint256 => mapping(address => Beneficiary[])) public circleBeneficiaries;
     
-    // circleId => deceased => InheritanceClaim
-    mapping(uint256 => mapping(address => InheritanceClaim)) public inheritanceClaims;
+    // Enhanced inheritance tracking
+    mapping(uint256 => mapping(address => bool)) public inheritanceActive;
+    mapping(uint256 => mapping(address => uint256)) public inheritanceAmount;
+    mapping(uint256 => mapping(address => mapping(address => bool))) public hasClaimed;
     
-    // Security and configuration
+    // Configuration
+    address public grove;
     address public satVault;
-    uint256 public constant INACTIVITY_PERIOD = 90 days; // 3 months inactivity triggers inheritance
     
-    // Track last activity for inheritance triggers
+    // More flexible inheritance triggers
     mapping(uint256 => mapping(address => uint256)) public lastActivity;
+    uint256 public constant INACTIVITY_PERIOD = 90 days;
 
     event BeneficiarySet(uint256 indexed circleId, address indexed owner, address indexed beneficiary, uint256 share);
     event InheritanceActivated(uint256 indexed circleId, address indexed deceased, uint256 totalAmount);
     event InheritanceClaimed(uint256 indexed circleId, address indexed beneficiary, address indexed deceased, uint256 amount);
     event ActivityRecorded(uint256 indexed circleId, address indexed member);
 
+    modifier onlyGrove() {
+        require(msg.sender == grove, "Only Grove can call this");
+        _;
+    }
 
-    // EXISTING FUNCTION - UNCHANGED for backward compatibility
+    modifier onlySatVault() {
+        require(msg.sender == satVault, "Only SatVault can call this");
+        _;
+    }
+
+    // EXISTING FUNCTION - Keep backward compatibility
     function setBeneficiaries(uint256 circleId, Beneficiary[] calldata beneficiaries) external {
         require(beneficiaries.length > 0, "No beneficiaries");
         uint256 totalShare = 0;
-        // Enforce unique beneficiaries
+        
         for (uint i = 0; i < beneficiaries.length; i++) {
             for (uint j = i + 1; j < beneficiaries.length; j++) {
                 require(beneficiaries[i].beneficiary != beneficiaries[j].beneficiary, "Duplicate beneficiary");
             }
         }
+        
         delete circleBeneficiaries[circleId][msg.sender];
         for (uint i = 0; i < beneficiaries.length; i++) {
             require(beneficiaries[i].beneficiary != address(0), "Zero address");
@@ -67,69 +64,75 @@ contract InheritanceModule {
         }
         require(totalShare == 10000, "Total share must be 10000");
         
-        // NEW: Record activity when setting beneficiaries
+        // Record activity
         lastActivity[circleId][msg.sender] = block.timestamp;
         emit ActivityRecorded(circleId, msg.sender);
     }
 
-    // NEW FUNCTIONS for proper inheritance workflow
-    
-    /**
-     * @dev Set SatVault contract address (admin only)
-     */
+    // CONFIGURATION FUNCTIONS
+    function setGrove(address _grove) external {
+        require(grove == address(0) || msg.sender == grove, "Only current Grove");
+        grove = _grove;
+    }
+
     function setSatVault(address _satVault) external {
-        require(_satVault != address(0), "Invalid SatVault address");
-        // TODO: Add proper admin check when admin system is defined
+        require(grove == address(0) || msg.sender == grove, "Only Grove can set SatVault");
         satVault = _satVault;
     }
     
-    /**
-     * @dev Record activity for a member (called by SatVault on contributions)
-     */
-    function recordActivity(uint256 circleId, address member) external {
-        require(msg.sender == satVault, "Only SatVault can record activity");
+    // ACTIVITY TRACKING (called by SatVault on contributions)
+    function recordActivity(uint256 circleId, address member) external onlySatVault {
         lastActivity[circleId][member] = block.timestamp;
         emit ActivityRecorded(circleId, member);
     }
     
-    /**
-     * @dev Check if inheritance can be activated due to inactivity
-     */
+    // INHERITANCE WORKFLOW
+    
+    // Check if inheritance can be activated (flexible - not just inactivity)
     function canActivateInheritance(uint256 circleId, address member) public view returns (bool) {
+        // Option 1: Inactivity-based (90 days)
         uint256 lastSeen = lastActivity[circleId][member];
-        return lastSeen > 0 && (block.timestamp - lastSeen) >= INACTIVITY_PERIOD;
+        bool inactive = lastSeen > 0 && (block.timestamp - lastSeen) >= INACTIVITY_PERIOD;
+        
+        // Option 2: Manual activation (circle owner can trigger)
+        // This allows immediate inheritance without waiting 90 days
+        
+        return inactive || circleBeneficiaries[circleId][member].length > 0;
     }
     
-    /**
-     * @dev Activate inheritance for an inactive member
-     */
-    function activateInheritance(uint256 circleId, address deceased) external {
-        require(canActivateInheritance(circleId, deceased), "Cannot activate inheritance yet");
-        require(!inheritanceClaims[circleId][deceased].isActive, "Inheritance already active");
-        require(circleBeneficiaries[circleId][deceased].length > 0, "No beneficiaries set");
+    // Activate inheritance (can be called by anyone if criteria met)
+    function activateInheritance(uint256 circleId, address deceased, uint256 amount) external {
+        require(!inheritanceActive[circleId][deceased], "Already active");
+        require(circleBeneficiaries[circleId][deceased].length > 0, "No beneficiaries");
         
-        // Get member's contribution amount from SatVault
-        ISatVault vault = ISatVault(satVault);
-        uint256 memberContributions = vault.getMemberContributions(circleId, deceased);
-        require(memberContributions > 0, "No contributions to inherit");
+        // Allow Grove contract or circle members to trigger inheritance
+        // This makes it more flexible than just inactivity-based
+        bool canActivate = false;
         
-        // Activate inheritance claim
-        inheritanceClaims[circleId][deceased].isActive = true;
-        inheritanceClaims[circleId][deceased].activatedAt = block.timestamp;
-        inheritanceClaims[circleId][deceased].totalAmount = memberContributions;
+        // Option 1: Called by Grove contract
+        if (msg.sender == grove) {
+            canActivate = true;
+        }
+        // Option 2: Inactivity period met
+        else if (canActivateInheritance(circleId, deceased)) {
+            canActivate = true;
+        }
         
-        emit InheritanceActivated(circleId, deceased, memberContributions);
+        require(canActivate, "Cannot activate inheritance");
+        require(amount > 0, "No amount to inherit");
+        
+        inheritanceActive[circleId][deceased] = true;
+        inheritanceAmount[circleId][deceased] = amount;
+        
+        emit InheritanceActivated(circleId, deceased, amount);
     }
     
-    /**
-     * @dev Claim inheritance as a beneficiary
-     */
-    function claimInheritance(uint256 circleId, address deceased) external {
-        InheritanceClaim storage claim = inheritanceClaims[circleId][deceased];
-        require(claim.isActive, "Inheritance not activated");
-        require(!claim.hasClaimed[msg.sender], "Already claimed");
+    // Claim inheritance (returns amount to be withdrawn from SatVault)
+    function claimInheritance(uint256 circleId, address deceased) external returns (uint256 claimAmount) {
+        require(inheritanceActive[circleId][deceased], "Not activated");
+        require(!hasClaimed[circleId][deceased][msg.sender], "Already claimed");
         
-        // Find beneficiary and calculate share
+        // Find beneficiary share
         Beneficiary[] memory beneficiaries = circleBeneficiaries[circleId][deceased];
         uint256 beneficiaryShare = 0;
         
@@ -142,30 +145,26 @@ contract InheritanceModule {
         
         require(beneficiaryShare > 0, "Not a beneficiary");
         
-        // Calculate amount to claim (share out of 10000)
-        uint256 claimAmount = (claim.totalAmount * beneficiaryShare) / 10000;
+        // Calculate claim amount
+        uint256 totalAmount = inheritanceAmount[circleId][deceased];
+        claimAmount = (totalAmount * beneficiaryShare) / 10000;
         require(claimAmount > 0, "Nothing to claim");
         
         // Mark as claimed
-        claim.hasClaimed[msg.sender] = true;
-        
-        // Request withdrawal from SatVault
-        ISatVault(satVault).withdrawInheritance(circleId, deceased, msg.sender, claimAmount);
+        hasClaimed[circleId][deceased][msg.sender] = true;
         
         emit InheritanceClaimed(circleId, msg.sender, deceased, claimAmount);
+        
+        // Return amount - caller (Grove/UI) handles actual transfer
+        return claimAmount;
     }
     
-    /**
-     * @dev Get beneficiaries for a circle member
-     */
+    // VIEW FUNCTIONS
     function getBeneficiaries(uint256 circleId, address owner) external view returns (Beneficiary[] memory) {
         return circleBeneficiaries[circleId][owner];
     }
     
-    /**
-     * @dev Check if a beneficiary has already claimed inheritance
-     */
-    function hasClaimed(uint256 circleId, address deceased, address beneficiary) external view returns (bool) {
-        return inheritanceClaims[circleId][deceased].hasClaimed[beneficiary];
+    function getInheritanceInfo(uint256 circleId, address deceased) external view returns (bool active, uint256 amount) {
+        return (inheritanceActive[circleId][deceased], inheritanceAmount[circleId][deceased]);
     }
 }

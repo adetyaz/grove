@@ -15,7 +15,10 @@ export async function POST(req: NextRequest) {
       deadline,
       ownerWallet,
       ownerEmail,
+      punishmentPreset,
     } = await req.json();
+
+    
 
     // First, ensure the user exists in database
     let user = await prisma.user.findUnique({
@@ -100,9 +103,7 @@ export async function GET(req: NextRequest) {
     if (!userWallet && !userEmail) {
       // No user context, return nothing
       return Response.json({ circles: [] });
-    }
-
-    // Find the user by wallet or email
+    } // Find the user by wallet or email
 
     const userOr: any[] = [];
     if (userWallet) userOr.push({ wallet: userWallet });

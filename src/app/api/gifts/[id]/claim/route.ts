@@ -1,83 +1,130 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { giftEngineContract } from "@/lib/giftengine-contract";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { token: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { token } = params;
+    const giftId = params.id;
     const { walletAddress } = await request.json();
 
-    if (!token || !walletAddress) {
+    if (!giftId || !walletAddress) {
       return NextResponse.json(
-        { error: "Gift token and wallet address are required" },
+        { error: "Gift ID and wallet address are required" },
         { status: 400 }
       );
     }
 
-    // TODO: Implement actual gift claiming logic
-    // 1. Verify gift token exists and is not expired
-    // 2. Verify gift hasn't been claimed already
-    // 3. Transfer the funds to the recipient's wallet
-    // 4. Mark gift as claimed in database
+    // 1. Find the gift claim invite by giftId
+    const giftClaim = await prisma.giftClaimInvite.findFirst({
+      where: { giftId: giftId },
+    });
 
-    // For now, simulate the claiming process
-    console.log(`Claiming gift ${token} to wallet ${walletAddress}`);
+    if (!giftClaim) {
+      return NextResponse.json({ error: "Gift not found" }, { status: 404 });
+    }
 
-    // Simulate checking gift status
-    if (!token.startsWith("gift_")) {
+    if (giftClaim.claimedAt) {
       return NextResponse.json(
-        { error: "Invalid gift token" },
-        { status: 400 }
+        {
+          error: "Gift already claimed",
+          claimedAt: giftClaim.claimedAt,
+          claimedBy: giftClaim.claimedByAddress,
+        },
+        { status: 410 }
       );
     }
 
-    // TODO: Query database to check gift status
-    // const gift = await db.giftInvitations.findUnique({
-    //   where: { giftToken: token }
-    // });
+    if (new Date() > giftClaim.expiresAt) {
+      return NextResponse.json({ error: "Gift has expired" }, { status: 410 });
+    }
 
-    // if (!gift) {
-    //   return NextResponse.json({ error: "Gift not found" }, { status: 404 });
-    // }
+    // 2. Execute blockchain transaction to claim the gift
+    try {
+      const claimResult = await giftEngineContract.claimEscrowGift(
+        giftId,
+        walletAddress as `0x${string}`
+      );
 
-    // if (gift.status === 'CLAIMED') {
-    //   return NextResponse.json({ error: "Gift already claimed" }, { status: 410 });
-    // }
+      // 3. Mark gift as claimed in database
+      const updatedGiftClaim = await prisma.giftClaimInvite.update({
+        where: { id: giftClaim.id },
+        data: {
+          claimedAt: new Date(),
+          claimedByAddress: walletAddress,
+        },
+      });
 
-    // if (new Date() > gift.expiresAt) {
-    //   return NextResponse.json({ error: "Gift has expired" }, { status: 410 });
-    // }
+      console.log("Gift claimed successfully:", {
+        giftId: giftId,
+        amount: giftClaim.amount,
+        claimedBy: walletAddress,
+        txHash: claimResult.hash,
+      });
 
-    // TODO: Execute blockchain transaction to transfer funds
-    // const txResult = await groveContract.claimGift(gift.circleId, walletAddress);
+      return NextResponse.json({
+        success: true,
+        txHash: claimResult.hash,
+        amount: giftClaim.amount,
+        claimedAt: updatedGiftClaim.claimedAt,
+        claimedBy: walletAddress,
+        senderName: giftClaim.senderName,
+        circleName: giftClaim.circleName,
+        message: giftClaim.message,
+        occasion: giftClaim.occasion,
+      });
+    } catch (blockchainError: any) {
+      console.error("Blockchain claim failed:", blockchainError);
 
-    // TODO: Update gift status in database
-    // await db.giftInvitations.update({
-    //   where: { giftToken: token },
-    //   data: {
-    //     status: 'CLAIMED',
-    //     claimedAt: new Date(),
-    //     claimedByAddress: walletAddress
-    //   }
-    // });
+      // Check if it's a specific contract error
+      if (blockchainError.message?.includes("Gift already claimed")) {
+        // Update database to reflect actual state
+        await prisma.giftClaimInvite.update({
+          where: { id: giftClaim.id },
+          data: {
+            claimedAt: new Date(),
+            claimedByAddress: "unknown", // Since we don't know who claimed it
+          },
+        });
+        return NextResponse.json(
+          {
+            error: "Gift has already been claimed on the blockchain",
+          },
+          { status: 410 }
+        );
+      }
 
-    // Simulate successful claim
-    const claimResult = {
-      success: true,
-      txHash: `0x${Math.random().toString(16).substr(2, 64)}`,
-      amount: "0.005", // This should come from the actual gift data
-      claimedAt: new Date().toISOString(),
-      claimedBy: walletAddress,
-    };
+      if (blockchainError.message?.includes("Gift has expired")) {
+        return NextResponse.json(
+          {
+            error: "Gift has expired on the blockchain",
+          },
+          { status: 410 }
+        );
+      }
 
-    console.log("Gift claimed successfully:", claimResult);
+      if (blockchainError.message?.includes("Not the gift recipient")) {
+        return NextResponse.json(
+          {
+            error: "This wallet address is not authorized to claim this gift",
+          },
+          { status: 403 }
+        );
+      }
 
-    return NextResponse.json(claimResult);
+      // Generic blockchain error
+      throw blockchainError;
+    }
   } catch (error) {
     console.error("Error claiming gift:", error);
     return NextResponse.json(
-      { error: "Failed to claim gift" },
+      {
+        error:
+          "Failed to claim gift: " +
+          (error instanceof Error ? error.message : "Unknown error"),
+      },
       { status: 500 }
     );
   }

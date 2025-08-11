@@ -71,7 +71,7 @@ export async function POST(
     }
 
     const claimLink = `${
-      process.env.NEXTAUTH_URL || "http://localhost:3000"
+      process.env.NEXTAUTH_URL || "https://grove-wine.vercel.app"
     }/claim/${claimToken}`;
 
     const emailTemplate = giftClaimEmail({

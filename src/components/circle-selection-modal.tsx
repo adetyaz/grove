@@ -60,8 +60,8 @@ export default function CircleSelectionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className='max-w-2xl max-h-[80vh] overflow-y-auto bg-slate-900/95 backdrop-blur-sm border-white/20'>
-        <DialogHeader>
+      <DialogContent className='max-w-2xl h-fit max-h-[80vh] bg-slate-900/95 backdrop-blur-sm border-white/20 flex flex-col'>
+        <DialogHeader className='flex-shrink-0'>
           <DialogTitle className='text-white text-xl font-bold flex items-center'>
             {actionType === "contribute" ? (
               <>
@@ -77,7 +77,8 @@ export default function CircleSelectionModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className='space-y-4 mt-4'>
+        <div className='flex-1 min-h-0 mt-4'>
+          <div className='space-y-4 max-h-full overflow-y-auto'>
           {circles.length === 0 ? (
             <div className='text-center py-8'>
               <p className='text-gray-400'>No circles available</p>
@@ -154,9 +155,10 @@ export default function CircleSelectionModal({
               );
             })
           )}
+          </div>
         </div>
 
-        <div className='flex justify-end mt-6'>
+        <div className='flex justify-end mt-6 flex-shrink-0'>
           <Button
             variant='outline'
             onClick={onClose}

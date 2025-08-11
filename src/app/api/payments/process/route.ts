@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { AutomatedPaymentService } from "@/lib/automated-payment-service";
+import { punishmentSystem } from "@/lib/punishment-system";
 
 export async function POST(request: NextRequest) {
   try {
@@ -131,7 +132,7 @@ export async function POST(request: NextRequest) {
         // Log the contribution activity
         await fetch(
           `${
-            process.env.NEXTAUTH_URL || "http://localhost:3000"
+            process.env.NEXTAUTH_URL || "https://grove-wine.vercel.app"
           }/api/activity/track-contribution`,
           {
             method: "POST",
@@ -193,6 +194,14 @@ export async function POST(request: NextRequest) {
               retryCount: { increment: 1 },
             },
           });
+
+          // Apply punishment for payment failure
+          await punishmentSystem.handlePaymentFailure(
+            schedule.userAddress,
+            schedule.circleId,
+            payment.id,
+            error instanceof Error ? error.message : "Unknown error"
+          );
         }
 
         const failedPayments = await prisma.recurringPayment.count({
