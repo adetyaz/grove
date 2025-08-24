@@ -16,12 +16,12 @@ export const ACHIEVEMENTS_CONTRACT_ADDRESS =
   "0x1B92C1F5DB409C8E3E37E5132de3fAF11d73C562";
 
 // Contract ABIs
-import TREASURY_ABI from "@/contracts/abis/Treasury.json";
-import GROVE_ABI from "@/contracts/abis/Grove.json";
-import VOTING_ABI from "@/contracts/abis/Voting.json";
-import INHERITANCE_ABI from "@/contracts/abis/Inheritance.json";
-import GIFTS_ABI from "@/contracts/abis/Gifts.json";
-import ACHIEVEMENTS_ABI from "@/contracts/abis/Achievements.json";
+import TREASURY_ABI from "../contracts/abis/Treasury.json";
+import GROVE_ABI from "../contracts/abis/Grove.json";
+import VOTING_ABI from "../contracts/abis/Voting.json";
+import INHERITANCE_ABI from "../contracts/abis/Inheritance.json";
+import GIFTS_ABI from "../contracts/abis/Gifts.json";
+import ACHIEVEMENTS_ABI from "../contracts/abis/Achievements.json";
 
 export {
   TREASURY_ABI,
