@@ -9,16 +9,14 @@ export async function POST(req: NextRequest) {
       name,
       description,
       targetAmount,
-      paymentType,
-      fixedAmount,
-      frequency,
-      deadline,
       ownerWallet,
       ownerEmail,
-      punishmentPreset,
+      // Grove system fields
+      contributionAmount,
+      contributionInterval,
+      durationDays,
+      isPublic,
     } = await req.json();
-
-    
 
     // First, ensure the user exists in database
     let user = await prisma.user.findUnique({
@@ -41,16 +39,16 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Create circle in database
+    // Create circle in database using Grove schema
     const circle = await prisma.circle.create({
       data: {
         name,
         description: description || "",
         targetAmount: targetAmount.toString(),
-        paymentType: paymentType === 1 ? "RECURRING" : "ONETIME",
-        fixedAmount: fixedAmount ? fixedAmount.toString() : null,
-        frequency: paymentType === 1 ? frequency : null,
-        deadline: new Date(Number(deadline) * 1000),
+        contributionAmount: contributionAmount.toString(),
+        contributionInterval: contributionInterval.toString(),
+        durationDays: durationDays.toString(),
+        isPublic: Boolean(isPublic),
         ownerId: user.id,
         syncStatus: "PENDING",
       },
@@ -71,7 +69,9 @@ export async function POST(req: NextRequest) {
           circleName: name,
           circleId: circle.id,
           targetAmount: targetAmount.toString(),
-          paymentType: paymentType === 1 ? "RECURRING" : "ONETIME",
+          contributionAmount: contributionAmount.toString(),
+          durationDays: durationDays.toString(),
+          isPublic: Boolean(isPublic),
         }
       );
     } catch (activityError) {

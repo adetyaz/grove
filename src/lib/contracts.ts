@@ -1,31 +1,37 @@
-export const SATVAULT_CONTRACT_ADDRESS =
-  "0x4C6Caf189d5dbF9fb201556dDcC027F0562598F6";
-export const GROVE_CONTRACT_ADDRESS =
-  "0xd6f967aCcf922dECf0d293625223F63b23055d15";
-export const GIFTENGINE_CONTRACT_ADDRESS =
-  "0xB1F7c95d4B9dE383171b931f897E443Ff0339d81";
-export const ACHIEVEMENTNFT_CONTRACT_ADDRESS =
-  "0x30325a1fF2361F72059191aD4Cb97599442B3247";
-export const GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS =
-  "0x33f085b99AA6219CE6eE3174FdB3191B0e29B738";
-export const INHERITANCEMODULE_CONTRACT_ADDRESS =
-  "0xf40dfDb2658A8027c7E5769C5f2E721130559995";
+// Grove Platform - Contract Addresses
+// Deployment Date: August 22, 2025
+// Network: Citrea Testnet
 
-import SATVAULT_ABI from "@/contracts/ABIs/SatVault.json";
-import GROVE_ABI from "@/contracts/ABIs/Grove.json";
-import GIFTENGINE_ABI from "@/contracts/ABIs/GiftEngine.json";
-import ACHIEVEMENTNFT_ABI from "@/contracts/ABIs/AchievementNFT.json";
-import GROVE_ACHIEVEMENTS_ABI from "@/contracts/ABIs/GroveAchievements.json";
-import INHERITANCEMODULE_ABI from "@/contracts/ABIs/InheritanceModule.json";
+export const TREASURY_CONTRACT_ADDRESS =
+  "0xcEdE89F7eA6095e575BFA473774577a074aC73bC";
+export const GROVE_CONTRACT_ADDRESS =
+  "0x37Ff2D9A3d1f0a2c421A60F000676d5f90C67b5e";
+export const VOTING_CONTRACT_ADDRESS =
+  "0x958698Ef5e9F8B1f926E8aE93AEF0d03DDb28704";
+export const INHERITANCE_CONTRACT_ADDRESS =
+  "0xFeb5a4515436d4F411B62b615D6DF333B34AF6c4";
+export const GIFTS_CONTRACT_ADDRESS =
+  "0xC02594Bc750db60A05095bF312C7C85F8cf16837";
+export const ACHIEVEMENTS_CONTRACT_ADDRESS =
+  "0x1B92C1F5DB409C8E3E37E5132de3fAF11d73C562";
+
+// Contract ABIs
+import TREASURY_ABI from "@/contracts/abis/Treasury.json";
+import GROVE_ABI from "@/contracts/abis/Grove.json";
+import VOTING_ABI from "@/contracts/abis/Voting.json";
+import INHERITANCE_ABI from "@/contracts/abis/Inheritance.json";
+import GIFTS_ABI from "@/contracts/abis/Gifts.json";
+import ACHIEVEMENTS_ABI from "@/contracts/abis/Achievements.json";
 
 export {
-  SATVAULT_ABI,
+  TREASURY_ABI,
   GROVE_ABI,
-  GIFTENGINE_ABI,
-  ACHIEVEMENTNFT_ABI,
-  GROVE_ACHIEVEMENTS_ABI,
-  INHERITANCEMODULE_ABI,
+  VOTING_ABI,
+  INHERITANCE_ABI,
+  GIFTS_ABI,
+  ACHIEVEMENTS_ABI,
 };
+
 import { type Address } from "viem";
 
 // Citrea Network Configuration

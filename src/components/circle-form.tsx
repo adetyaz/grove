@@ -5,12 +5,11 @@ import {
   CITREA_TESTNET,
   GROVE_CONTRACT_ADDRESS,
   GROVE_ABI,
-} from "@/contracts/constants";
+} from "@/lib/contracts";
 import { useState, useEffect } from "react";
 import { parseEther } from "viem";
 import { groveToast } from "@/lib/toast";
 import { formatBtcAmount } from "@/lib/btc-conversion";
-import { PUNISHMENT_PRESETS } from "@/lib/punishment-system";
 
 interface CircleFormProps {
   onSuccess?: () => void;
@@ -41,12 +40,14 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
     name: "",
     description: "",
     targetAmount: "",
-    paymentType: 0,
-    fixedAmount: "",
-    frequency: "MONTHLY",
-    deadline: "",
-    hasDeadline: true, // New field to control deadline requirement
-    punishmentPreset: "MODERATE" as keyof typeof PUNISHMENT_PRESETS,
+    contributionAmount: "",
+    contributionInterval: "86400", // Default: daily (24 hours in seconds)
+    durationDays: "30", // Default: 30 days
+    isPublic: false,
+    // Legacy fields for database compatibility (will be converted)
+    paymentType: 1, // Always recurring for V3
+    frequency: "DAILY",
+    hasDeadline: true,
   });
 
   useEffect(() => {
@@ -88,52 +89,20 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
 
     try {
       const targetAmountWei = parseEther(formData.targetAmount);
-      const fixedAmountWei = formData.fixedAmount
-        ? parseEther(formData.fixedAmount)
-        : BigInt(0);
+      const contributionAmountWei = parseEther(formData.contributionAmount);
+      const durationDaysBigInt = BigInt(formData.durationDays);
 
-      // Deadline validation based on payment type
-      let deadlineTimestamp = BigInt(0); // Default to no deadline (0)
-
-      if (formData.paymentType === 0) {
-        // One-time payments: Deadline is REQUIRED
-        if (!formData.deadline) {
-          groveToast.error("One-time payment circles must have a deadline");
-          return;
-        }
-        deadlineTimestamp = BigInt(
-          Math.floor(new Date(formData.deadline).getTime() / 1000)
-        );
-        if (deadlineTimestamp <= BigInt(Math.floor(Date.now() / 1000))) {
-          groveToast.error("Deadline must be in the future");
-          return;
-        }
-      } else if (formData.paymentType === 1) {
-        // Recurring payments: Deadline is OPTIONAL
-        if (formData.hasDeadline && formData.deadline) {
-          deadlineTimestamp = BigInt(
-            Math.floor(new Date(formData.deadline).getTime() / 1000)
-          );
-          if (deadlineTimestamp <= BigInt(Math.floor(Date.now() / 1000))) {
-            groveToast.error("Deadline must be in the future");
-            return;
-          }
-        } else if (formData.hasDeadline && !formData.deadline) {
-          groveToast.error("Please set a deadline or choose 'No Deadline'");
-          return;
-        }
-        // If hasDeadline is false, deadlineTimestamp stays 0 (no deadline)
-      }
-
+      // Validation
       if (targetAmountWei <= 0) {
         groveToast.error("Target amount must be greater than 0");
         return;
       }
-      if (
-        formData.paymentType === 1 &&
-        (!formData.fixedAmount || parseFloat(formData.fixedAmount) <= 0)
-      ) {
-        groveToast.error("Recurring amount must be greater than 0");
+      if (contributionAmountWei <= 0) {
+        groveToast.error("Contribution amount must be greater than 0");
+        return;
+      }
+      if (durationDaysBigInt <= 0) {
+        groveToast.error("Duration must be greater than 0 days");
         return;
       }
 
@@ -151,13 +120,13 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
           name: formData.name,
           description: formData.description,
           targetAmount: targetAmountWei.toString(),
-          paymentType: formData.paymentType,
-          fixedAmount: fixedAmountWei.toString(),
-          frequency: formData.frequency,
-          deadline: deadlineTimestamp.toString(),
           ownerWallet: address,
           ownerEmail: user?.email || `${address}@grove.temp`,
-          punishmentPreset: formData.punishmentPreset,
+          // Grove system fields
+          contributionAmount: contributionAmountWei.toString(),
+          contributionInterval: formData.contributionInterval,
+          durationDays: formData.durationDays,
+          isPublic: formData.isPublic,
         }),
       });
 
@@ -170,17 +139,21 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
 
       groveToast.info("Circle created in database, deploying to blockchain...");
 
-      const contributionAmount = BigInt(1);
-      const interval = BigInt(86400);
-      const goal = targetAmountWei;
-
       setIsCreating(false);
 
       const txHash = await writeContractAsync({
         address: GROVE_CONTRACT_ADDRESS,
         abi: GROVE_ABI,
         functionName: "createCircle",
-        args: [formData.name, contributionAmount, interval, goal],
+        args: [
+          formData.name,
+          formData.description,
+          targetAmountWei,
+          contributionAmountWei,
+          BigInt(formData.contributionInterval),
+          BigInt(formData.durationDays),
+          formData.isPublic,
+        ],
       });
 
       setHash(txHash);
@@ -207,57 +180,19 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
               );
               setIsConfirmed(true);
 
-              // Auto-enable voting for recurring circles
-              if (formData.paymentType === 1) {
-                // 1 = RECURRING
-                try {
-                  groveToast.info(
-                    "Enabling democratic voting for recurring circle..."
-                  );
-
-                  const { votingModuleService } = await import(
-                    "@/lib/voting-module-contract"
-                  );
-
-                  // Enable voting with delegation
-                  const enableHash =
-                    await votingModuleService.enableVotingWithDelegation(
-                      syncData.circleId,
-                      address as `0x${string}`
-                    );
-                  console.log("✅ Voting enabled for circle:", enableHash);
-
-                  // Deposit escrow for voting operations
-                  const escrowHash = await votingModuleService.depositEscrow(
-                    syncData.circleId,
-                    "0.1", // 0.1 ETH
-                    address as `0x${string}`
-                  );
-                  console.log("✅ Escrow deposited for voting:", escrowHash);
-
-                  groveToast.success(
-                    `Circle created with democratic voting enabled!`
-                  );
-                } catch (votingError: any) {
-                  console.error("Failed to enable voting:", votingError);
-                  groveToast.warning(
-                    `Circle created successfully, but voting enablement failed. You can enable it later from the circle page.`
-                  );
-                }
-              }
-
               setIsNavigating(true);
 
               setFormData({
                 name: "",
                 description: "",
                 targetAmount: "",
-                paymentType: 0,
-                fixedAmount: "",
-                frequency: "MONTHLY",
-                deadline: "",
+                contributionAmount: "",
+                contributionInterval: "86400",
+                durationDays: "30",
+                isPublic: false,
+                paymentType: 1,
+                frequency: "DAILY",
                 hasDeadline: true,
-                punishmentPreset: "MODERATE" as keyof typeof PUNISHMENT_PRESETS,
               });
 
               if (onSuccess) {
@@ -410,273 +345,88 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
 
           <div>
             <label className='block text-sm font-medium text-white mb-2'>
-              Payment Type *
+              Contribution Amount per Payment (BTC) *
             </label>
-            <select
-              name='paymentType'
-              value={formData.paymentType}
+            <input
+              type='number'
+              name='contributionAmount'
+              value={formData.contributionAmount}
               onChange={handleInputChange}
-              className='w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white backdrop-blur-sm transition-all duration-300'
-            >
-              <option value={0} className='bg-gray-800 text-white'>
-                One-Time Payment
-              </option>
-              <option value={1} className='bg-gray-800 text-white'>
-                Recurring Payments
-              </option>
-            </select>
-          </div>
-        </div>
-
-        {formData.paymentType === 1 && (
-          <div className='bg-blue-500/20 border-2 border-purple-500 rounded-lg p-6 space-y-4'>
-            <h3 className='text-purple-300 font-bold text-lg'>
-              Recurring Payment Settings
-            </h3>
-
-            <div>
-              <label className='block text-sm font-medium text-white mb-2'>
-                Payment Frequency *
-              </label>
-              <select
-                name='frequency'
-                value={formData.frequency}
-                onChange={handleInputChange}
-                className='w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500'
-                required
-              >
-                <option value='DAILY'>Daily</option>
-                <option value='WEEKLY'>Weekly</option>
-                <option value='MONTHLY'>Monthly</option>
-              </select>
-            </div>
-
-            <div>
-              <label className='block text-sm font-medium text-white mb-2'>
-                Contribution Amount per Payment (BTC) *
-              </label>
-              <input
-                type='number'
-                name='fixedAmount'
-                value={formData.fixedAmount}
-                onChange={handleInputChange}
-                placeholder='0.001'
-                step='0.0001'
-                min='0'
-                className='w-full p-4 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500'
-                required
-              />
-              {formData.fixedAmount && parseFloat(formData.fixedAmount) > 0 && (
+              placeholder='0.001'
+              step='0.0001'
+              min='0'
+              className='w-full p-4 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500'
+              required
+            />
+            {formData.contributionAmount &&
+              parseFloat(formData.contributionAmount) > 0 && (
                 <p className='text-xs text-gray-300 mt-1'>
                   ≈{" "}
-                  {formatBtcAmount(formData.fixedAmount, {
+                  {formatBtcAmount(formData.contributionAmount, {
                     showBoth: false,
                     btcFirst: false,
                   })}{" "}
                   per payment
                 </p>
               )}
-              <p className='text-xs text-gray-300 mt-2 flex items-center'>
-                <span className='mr-1'>🔄</span>
-                This amount will be contributed{" "}
-                {formData.frequency.toLowerCase()} by each member
-              </p>
-            </div>
           </div>
-        )}
 
-        {/* Goal Deadline Controls - Compulsory for One-Time, Optional for Recurring */}
-        {formData.paymentType === 0 ? (
-          // One-Time Payments: Deadline is COMPULSORY
-          <div className='bg-green-500/20 border-2 border-green-500 rounded-lg p-6 space-y-4'>
-            <h3 className='text-green-300 font-bold text-lg'>
-              💰 One-Time Payment Settings
-            </h3>
+          <div>
+            <label className='block text-sm font-medium text-white mb-2'>
+              Contribution Interval (seconds) *
+            </label>
+            <select
+              name='contributionInterval'
+              value={formData.contributionInterval}
+              onChange={handleInputChange}
+              className='w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500'
+              required
+            >
+              <option value='86400'>Daily (24 hours)</option>
+              <option value='604800'>Weekly (7 days)</option>
+              <option value='2592000'>Monthly (30 days)</option>
+            </select>
+          </div>
 
-            <div>
-              <label className='block text-sm text-left font-medium text-white mb-2'>
-                Goal Deadline *
-              </label>
+          <div>
+            <label className='block text-sm font-medium text-white mb-2'>
+              Duration (days) *
+            </label>
+            <input
+              type='number'
+              name='durationDays'
+              value={formData.durationDays}
+              onChange={handleInputChange}
+              placeholder='30'
+              min='1'
+              className='w-full p-4 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500'
+              required
+            />
+            <p className='text-xs text-gray-300 mt-1'>
+              How long the circle will run (in days)
+            </p>
+          </div>
+
+          <div>
+            <label className='flex items-center text-white'>
               <input
-                type='datetime-local'
-                name='deadline'
-                value={formData.deadline}
-                onChange={handleInputChange}
-                className='w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white backdrop-blur-sm transition-all duration-300'
-                required
+                type='checkbox'
+                name='isPublic'
+                checked={formData.isPublic}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    isPublic: e.target.checked,
+                  }))
+                }
+                className='mr-2 text-purple-500 focus:ring-purple-500'
               />
-              <p className='text-xs text-gray-300 mt-1'>
-                Set payment deadlines
-              </p>
-            </div>
+              <span className='text-sm'>
+                Make this circle public (others can discover and join)
+              </span>
+            </label>
           </div>
-        ) : (
-          // Recurring Payments: Deadline is OPTIONAL
-          <div className='bg-blue-500/20 border-2 border-blue-500 rounded-lg p-6 space-y-4'>
-            <h3 className='text-blue-300 font-bold text-lg'>
-              ⏰ Recurring Payment Deadline (Optional)
-            </h3>
-
-            <div>
-              <label className='block text-sm text-left font-medium text-white mb-3'>
-                Goal Deadline
-              </label>
-
-              {/* Deadline Option Toggle for Recurring Only */}
-              <div className='flex space-x-4 mb-4'>
-                <label className='flex items-center'>
-                  <input
-                    type='radio'
-                    name='hasDeadline'
-                    checked={formData.hasDeadline === true}
-                    onChange={() =>
-                      setFormData((prev) => ({ ...prev, hasDeadline: true }))
-                    }
-                    className='mr-2 text-primary focus:ring-primary'
-                  />
-                  <span className='text-white text-sm'>Set deadline</span>
-                </label>
-                <label className='flex items-center'>
-                  <input
-                    type='radio'
-                    name='hasDeadline'
-                    checked={formData.hasDeadline === false}
-                    onChange={() =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        hasDeadline: false,
-                        deadline: "",
-                      }))
-                    }
-                    className='mr-2 text-primary focus:ring-primary'
-                  />
-                  <span className='text-white text-sm'>No deadline</span>
-                </label>
-              </div>
-
-              {/* Deadline Input (only shown if hasDeadline is true) */}
-              {formData.hasDeadline && (
-                <input
-                  type='datetime-local'
-                  name='deadline'
-                  value={formData.deadline}
-                  onChange={handleInputChange}
-                  className='w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white backdrop-blur-sm transition-all duration-300'
-                  required={formData.hasDeadline}
-                />
-              )}
-
-              {!formData.hasDeadline && (
-                <div className='bg-blue-500/10 border border-blue-500/30 rounded-lg p-3'>
-                  <p className='text-blue-200 text-sm flex items-center'>
-                    <span className='mr-2'>∞</span>
-                    This recurring circle will run indefinitely without a
-                    deadline
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Punishment Settings Section - Only for recurring payments */}
-        {formData.paymentType === 1 && (
-          <div className='bg-orange-500/20 border-2 border-orange-500 rounded-lg p-6 space-y-4'>
-            <h3 className='text-orange-300 font-bold text-lg flex items-center'>
-              ⚖️ Missed Payment Policy
-            </h3>
-            <div className='text-orange-100 text-sm space-y-1'>
-              <p>
-                What happens when someone misses their scheduled recurring
-                payment?
-              </p>
-              <p className='text-orange-200'>
-                Choose how strict you want to be with members who don&apos;t pay
-                on time.
-              </p>
-            </div>
-
-            <div>
-              <label className='block text-sm font-medium text-white mb-3'>
-                Choose Enforcement Level *
-              </label>
-              <div className='space-y-3'>
-                {Object.entries(PUNISHMENT_PRESETS).map(([key, preset]) => {
-                  const isSelected = formData.punishmentPreset === key;
-                  return (
-                    <div
-                      key={key}
-                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                        isSelected
-                          ? "border-orange-500 bg-orange-500/20"
-                          : "border-gray-600 bg-gray-800/50 hover:border-gray-500"
-                      }`}
-                      onClick={() =>
-                        setFormData({
-                          ...formData,
-                          punishmentPreset:
-                            key as keyof typeof PUNISHMENT_PRESETS,
-                        })
-                      }
-                    >
-                      <div className='flex items-start justify-between'>
-                        <div className='flex-1'>
-                          <div className='flex items-center space-x-2 mb-2'>
-                            <input
-                              type='radio'
-                              name='punishmentPreset'
-                              value={key}
-                              checked={isSelected}
-                              onChange={handleInputChange}
-                              className='text-orange-500'
-                            />
-                            <h4 className='font-semibold text-white'>
-                              {preset.name}
-                            </h4>
-                          </div>
-                          {preset.enabled ? (
-                            <div className='text-sm text-gray-300 space-y-1'>
-                              <p>
-                                📝 {preset.maxWarnings} warning
-                                {preset.maxWarnings !== 1 ? "s" : ""} for missed
-                                payments (just logged)
-                              </p>
-                              <p>
-                                💰 Then{" "}
-                                {((preset.penaltyMultiplier - 1) * 100).toFixed(
-                                  0
-                                )}
-                                % extra fee on each missed payment
-                              </p>
-                              <p>
-                                ⏸️ Auto-disable payments after{" "}
-                                {preset.autoSuspendAfter} failures (can be
-                                re-enabled)
-                              </p>
-                              {preset.autoSuspendAfter <= 3 &&
-                              !preset.allowAppeals ? (
-                                <p>
-                                  🚫 Get kicked out of circle (no appeals
-                                  allowed)
-                                </p>
-                              ) : (
-                                <p>📋 Can appeal suspensions to rejoin</p>
-                              )}
-                            </div>
-                          ) : (
-                            <p className='text-sm text-gray-300'>
-                              😌 No consequences for missed payments
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
 
         {/* Transaction Status */}
         {isPending && (
@@ -746,12 +496,7 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
             !isOnCorrectNetwork ||
             !formData.name ||
             !formData.targetAmount ||
-            // One-time payments always need deadline, recurring only if hasDeadline is true
-            (formData.paymentType === 0 && !formData.deadline) ||
-            (formData.paymentType === 1 &&
-              formData.hasDeadline &&
-              !formData.deadline) ||
-            (formData.paymentType === 1 && !formData.fixedAmount)
+            !formData.contributionAmount
           }
           className='w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-white py-4 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-300 hover-lift disabled:hover:scale-100 shadow-lg hover:shadow-primary/25'
         >

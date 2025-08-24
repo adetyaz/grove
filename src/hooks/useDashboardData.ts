@@ -1,7 +1,7 @@
 "use client";
 import { useReadContract } from "wagmi";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
-import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/contracts/constants";
+import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/lib/contracts";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { formatEther } from "viem";
 

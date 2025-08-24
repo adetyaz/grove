@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createPublicClient, http } from "viem";
 import {
   CITREA_TESTNET,
-  GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
-} from "@/contracts/constants";
+  ACHIEVEMENTS_CONTRACT_ADDRESS,
+} from "@/lib/contracts";
 import { prisma } from "@/lib/db";
 
 export async function POST(request: NextRequest) {
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
         alreadyMinted: alreadyMinted.length,
         notEarned: notEarned.length,
       },
-      contractAddress: GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
+      contractAddress: ACHIEVEMENTS_CONTRACT_ADDRESS,
       instructions:
         claimableAchievements.length > 0
           ? "Call claimAchievement(achievementId) on the contract for each claimable achievement"

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { groveContract } from "@/lib/grove-contract";
 import { getDynamicUser } from "@/lib/dynamic";
-import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/contracts/constants";
+import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/lib/contracts";
 import { getPublicClient } from "@/lib/clients";
 
 export async function POST(req: NextRequest) {

@@ -22,7 +22,7 @@ import {
 import InviteForm from "./invite-form";
 import ContributeForm from "./contribute-form";
 import { useWriteContract } from "wagmi";
-import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/contracts/constants";
+import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/lib/contracts";
 import { groveToast } from "@/lib/toast";
 
 interface CircleCardProps {

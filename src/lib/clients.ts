@@ -1,5 +1,5 @@
 import { createWalletClient, createPublicClient, custom, http } from "viem";
-import { CITREA_TESTNET } from "@/contracts/constants";
+import { CITREA_TESTNET } from "@/lib/contracts";
 
 export function getWalletClient() {
   if (typeof window === "undefined") {

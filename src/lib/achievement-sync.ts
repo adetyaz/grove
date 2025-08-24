@@ -1,10 +1,10 @@
 // Helper function to sync contribution with GroveAchievements contract
 import { createWalletClient, custom, parseEther } from "viem";
 import {
-  GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
-  GROVE_ACHIEVEMENTS_ABI,
+  ACHIEVEMENTS_CONTRACT_ADDRESS,
+  ACHIEVEMENTS_ABI,
   CITREA_TESTNET,
-} from "@/contracts/constants";
+} from "@/lib/contracts";
 
 export async function syncContributionWithAchievements(
   userAddress: string,
@@ -24,8 +24,8 @@ export async function syncContributionWithAchievements(
       const amountWei = parseEther(contributionAmount);
 
       const hash = await walletClient.writeContract({
-        address: GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
-        abi: GROVE_ACHIEVEMENTS_ABI,
+        address: ACHIEVEMENTS_CONTRACT_ADDRESS,
+        abi: ACHIEVEMENTS_ABI,
         functionName: "manualTrackContribution",
         args: [userAddress as `0x${string}`, amountWei],
         account: userAddress as `0x${string}`,
@@ -56,8 +56,8 @@ export async function syncUserDataWithContract(
       const amountWei = parseEther(totalContributed);
 
       const hash = await walletClient.writeContract({
-        address: GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
-        abi: GROVE_ACHIEVEMENTS_ABI,
+        address: ACHIEVEMENTS_CONTRACT_ADDRESS,
+        abi: ACHIEVEMENTS_ABI,
         functionName: "manualTrackContribution",
         args: [userAddress as `0x${string}`, amountWei],
         account: userAddress as `0x${string}`,

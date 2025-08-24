@@ -2,9 +2,9 @@
 import { useReadContract, useWriteContract } from "wagmi";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import {
-  GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
-  GROVE_ACHIEVEMENTS_ABI,
-} from "@/contracts/constants";
+  ACHIEVEMENTS_CONTRACT_ADDRESS,
+  ACHIEVEMENTS_ABI,
+} from "@/lib/contracts";
 import { useCallback, useMemo } from "react";
 import { groveToast } from "@/lib/toast";
 import { useAchievementClaiming } from "@/hooks/useAchievementClaiming";
@@ -87,8 +87,8 @@ export function useAchievements() {
     isLoading: loadingAchievements,
     refetch: refetchAchievements,
   } = useReadContract({
-    address: GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
-    abi: GROVE_ACHIEVEMENTS_ABI,
+    address: ACHIEVEMENTS_CONTRACT_ADDRESS,
+    abi: ACHIEVEMENTS_ABI,
     functionName: "getUserStats",
     args: address ? [address] : undefined,
     query: {
@@ -109,8 +109,8 @@ export function useAchievements() {
   );
 
   const { data: achievementStats } = useReadContract({
-    address: GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
-    abi: GROVE_ACHIEVEMENTS_ABI,
+    address: ACHIEVEMENTS_CONTRACT_ADDRESS,
+    abi: ACHIEVEMENTS_ABI,
     functionName: "getUserStats",
     args: address ? [address] : undefined,
     query: {
@@ -151,8 +151,8 @@ export function useAchievements() {
           let txHash;
           try {
             txHash = await writeContractAsync({
-              address: GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
-              abi: GROVE_ACHIEVEMENTS_ABI,
+              address: ACHIEVEMENTS_CONTRACT_ADDRESS,
+              abi: ACHIEVEMENTS_ABI,
               functionName: "claimAchievement",
               args: [BigInt(achievementId)],
             });
@@ -162,8 +162,8 @@ export function useAchievements() {
               claimError
             );
             txHash = await writeContractAsync({
-              address: GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
-              abi: GROVE_ACHIEVEMENTS_ABI,
+              address: ACHIEVEMENTS_CONTRACT_ADDRESS,
+              abi: ACHIEVEMENTS_ABI,
               functionName: "awardAchievement",
               args: [address, BigInt(achievementId)],
             });

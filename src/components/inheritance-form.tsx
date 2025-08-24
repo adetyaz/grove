@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { inheritanceModuleContract } from "@/lib/inheritancemodule-contract";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { groveToast } from "@/lib/toast";
 
@@ -43,38 +42,9 @@ export default function InheritanceForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!address) {
-      groveToast.error("Connect your wallet to set beneficiaries.");
-      return;
-    }
-    if (beneficiaries.some((b) => !b.beneficiary || !b.share)) {
-      groveToast.error("Fill in all beneficiary addresses and shares.");
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const formatted = beneficiaries.map((b) => ({
-        beneficiary: b.beneficiary as `0x${string}`,
-        share: BigInt(b.share),
-      }));
-      const simulation = await inheritanceModuleContract.setBeneficiaries(
-        circleId,
-        formatted,
-        address as `0x${string}`
-      );
-      const { request } = simulation;
-      const publicClient = (inheritanceModuleContract as any).publicClient;
-      await publicClient.writeContract(request);
-      groveToast.success("Beneficiaries set successfully!");
-      onSuccess?.();
-      onClose?.();
-    } catch (err: any) {
-      groveToast.error(
-        "Failed to set beneficiaries: " + (err?.message || "Unknown error")
-      );
-    } finally {
-      setIsLoading(false);
-    }
+    // TODO: Implement Grove V3 inheritance system
+    groveToast.info("Grove V3 inheritance system coming soon!");
+    onClose?.();
   };
 
   return (

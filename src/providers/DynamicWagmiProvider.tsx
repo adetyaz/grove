@@ -6,7 +6,7 @@ import { createConfig, WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http } from "viem";
 import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
-import { CITREA_TESTNET } from "@/contracts/constants";
+import { CITREA_TESTNET } from "@/lib/contracts";
 
 // Configure Wagmi with primary focus on Citrea testnet
 const config = createConfig({

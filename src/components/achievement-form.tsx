@@ -2,7 +2,11 @@
 import { useState } from "react";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { groveToast } from "@/lib/toast";
-import { achievementNFTContract } from "@/lib/achievementnft-contract";
+import { useWriteContract } from "wagmi";
+import {
+  ACHIEVEMENTS_CONTRACT_ADDRESS,
+  ACHIEVEMENTS_ABI,
+} from "@/lib/contracts";
 
 interface AchievementFormProps {
   circleId: number;
@@ -23,6 +27,7 @@ export default function AchievementForm({
   const [isConfirming, setIsConfirming] = useState(false);
   const [error, setError] = useState<any>(null);
   const { primaryWallet } = useDynamicConnection();
+  const { writeContractAsync } = useWriteContract();
   const address = primaryWallet?.address;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,11 +44,15 @@ export default function AchievementForm({
       setError(null);
       setIsConfirming(false);
 
-      // Claim the achievement using the AchievementNFT contract
-      await achievementNFTContract.claimAchievement(
-        parseInt(achievementId),
-        address as `0x${string}`
-      );
+      // Claim the achievement using the Grove Achievements contract
+      const txHash = await writeContractAsync({
+        address: ACHIEVEMENTS_CONTRACT_ADDRESS,
+        abi: ACHIEVEMENTS_ABI,
+        functionName: "claimAchievement", // TODO: Update with actual Grove function name
+        args: [parseInt(achievementId)],
+      });
+
+      groveToast.success(`Achievement claimed! Transaction: ${txHash}`);
 
       setIsConfirming(true);
 
@@ -53,28 +62,24 @@ export default function AchievementForm({
         setIsPending(false);
         setIsLoading(false);
 
-        // Get achievement metadata and offer Farcaster sharing
+        // Get achievement metadata and offer sharing
         try {
-          const achievement =
-            await achievementNFTContract.getAchievementMetadata(
-              parseInt(achievementId)
-            );
-          const farcasterUrl = achievementNFTContract.generateFarcasterShareUrl(
-            achievement,
-            address
-          );
+          // TODO: Implement Grove achievement metadata retrieval
+          // const achievement = await getAchievementMetadata(parseInt(achievementId));
 
-          // Show success message
-          groveToast.success(`🏅 Achievement "${achievement.name}" claimed!`);
+          // For now, show success with placeholder
+          groveToast.success(`🏅 Achievement ${achievementId} claimed!`);
 
-          // Show Farcaster sharing option after a brief delay
+          // TODO: Implement sharing functionality for Grove achievements
+          // Show sharing option after a brief delay
           setTimeout(() => {
             if (
               window.confirm(
-                "🎉 Achievement claimed! Would you like to share this on Farcaster?"
+                "🎉 Achievement claimed! Would you like to share this achievement?"
               )
             ) {
-              window.open(farcasterUrl, "_blank");
+              // TODO: Implement Grove achievement sharing
+              groveToast.info("Sharing feature coming soon!");
             }
           }, 1000);
         } catch (err) {

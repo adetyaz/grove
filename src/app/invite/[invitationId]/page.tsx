@@ -11,7 +11,7 @@ import {
   formatDeadline,
   calculateProgress,
 } from "@/hooks/useDashboardData";
-import { GROVE_ABI, GROVE_CONTRACT_ADDRESS } from "@/contracts/constants";
+import { GROVE_ABI, GROVE_CONTRACT_ADDRESS } from "@/lib/contracts";
 import { Loader2, CheckCircle, XCircle, Clock, Users } from "lucide-react";
 import { groveToast } from "@/lib/toast";
 

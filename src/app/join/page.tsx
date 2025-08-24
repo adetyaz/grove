@@ -6,7 +6,7 @@ import {
   useWaitForTransactionReceipt,
   useReadContract,
 } from "wagmi";
-import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/contracts/constants";
+import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/lib/contracts";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { Button } from "@/components/ui/button";

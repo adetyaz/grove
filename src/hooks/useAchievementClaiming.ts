@@ -3,10 +3,14 @@ import { useWriteContract } from "wagmi";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { groveToast } from "@/lib/toast";
 import { useCallback } from "react";
-import { achievementNFTContract } from "@/lib/achievementnft-contract";
+import {
+  ACHIEVEMENTS_CONTRACT_ADDRESS,
+  ACHIEVEMENTS_ABI,
+} from "@/lib/contracts";
 
 export function useAchievementClaiming() {
   const { primaryWallet } = useDynamicConnection();
+  const { writeContractAsync } = useWriteContract();
   const address = primaryWallet?.address;
 
   const claimAchievement = useCallback(
@@ -18,11 +22,13 @@ export function useAchievementClaiming() {
       try {
         console.log(`🏆 Claiming achievement ${achievementId}...`);
 
-        // Use the AchievementNFT contract service
-        const txHash = await achievementNFTContract.claimAchievement(
-          achievementId,
-          address as `0x${string}`
-        );
+        // Use Grove V3 Achievements contract
+        const txHash = await writeContractAsync({
+          address: ACHIEVEMENTS_CONTRACT_ADDRESS,
+          abi: ACHIEVEMENTS_ABI,
+          functionName: "claimAchievement", // TODO: Update with actual V3 function name
+          args: [achievementId],
+        });
 
         groveToast.success(
           `🎉 Achievement NFT claimed! Transaction: ${txHash.slice(
@@ -52,7 +58,7 @@ export function useAchievementClaiming() {
         }
       }
     },
-    [address]
+    [address, writeContractAsync]
   );
 
   const claimMultipleAchievements = useCallback(

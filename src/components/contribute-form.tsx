@@ -8,12 +8,7 @@ import { groveToast } from "@/lib/toast";
 import { formatBtcAmount } from "@/lib/btc-conversion";
 
 import { useWriteContract, useReadContract } from "wagmi";
-import {
-  GROVE_CONTRACT_ADDRESS,
-  GROVE_ABI,
-  GROVE_ACHIEVEMENTS_CONTRACT_ADDRESS,
-  GROVE_ACHIEVEMENTS_ABI,
-} from "@/contracts/constants";
+import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/lib/contracts";
 
 interface ContributeFormProps {
   circleId: string;

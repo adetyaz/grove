@@ -6,7 +6,7 @@ import {
   type CreateCircleParams,
   type AddMemberParams,
   type ContributeParams,
-} from "@/contracts/constants";
+} from "@/lib/contracts";
 import { getPublicClient } from "@/lib/clients";
 import { type Address } from "viem";
 

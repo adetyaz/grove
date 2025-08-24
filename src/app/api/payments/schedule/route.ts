@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
         maxPayments: maxPayments || null,
       },
       include: {
-        circle: {
+        Circle: {
           select: {
             name: true,
             targetAmount: true,
@@ -100,13 +100,13 @@ export async function GET(request: NextRequest) {
         isActive: true,
       },
       include: {
-        circle: {
+        Circle: {
           select: {
             name: true,
             targetAmount: true,
           },
         },
-        payments: {
+        RecurringPayment: {
           orderBy: {
             createdAt: "desc",
           },
