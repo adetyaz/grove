@@ -15,7 +15,7 @@ export default function NavigationHeader() {
   const navigation = [
     { name: "Dashboard", href: "/dashboard" },
     { name: "Circles", href: "/circles" },
-    { name: "Finance", href: "/finance" },
+    { name: "Profile", href: "/profile" },
     { name: "Analytics", href: "/analytics" },
   ];
 
@@ -59,7 +59,7 @@ export default function NavigationHeader() {
             <Bell className='w-4 h-4' />
             <span className='absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full'></span>
           </Button>
-          <div className='flex items-center space-x-3'>
+          <Link href="/profile" className='flex items-center space-x-3 hover:bg-slate-100 rounded-lg p-2 transition-colors'>
             <Avatar className='w-8 h-8'>
               <AvatarFallback className='bg-gradient-to-br from-purple-500 to-pink-500 text-white text-sm'>
                 {userAddress ? userAddress.slice(2, 4).toUpperCase() : "A"}
@@ -67,12 +67,12 @@ export default function NavigationHeader() {
             </Avatar>
             <div className='hidden md:block'>
               <p className='text-sm font-semibold text-slate-800'>
-                Alex Budkemi
+                {userAddress ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}` : "Anonymous"}
               </p>
-              <p className='text-xs text-slate-500'>4.25⭐</p>
+              <p className='text-xs text-slate-500'>View Profile</p>
             </div>
             <ChevronDown className='w-4 h-4 text-slate-400' />
-          </div>
+          </Link>
         </div>
       </div>
     </header>

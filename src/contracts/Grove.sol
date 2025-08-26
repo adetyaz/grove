@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./Treasury.sol";
+import "./Achievements.sol";
 
 /**
  * @title Grove - Core Platform Management
@@ -13,6 +14,7 @@ import "./Treasury.sol";
 contract Grove is ReentrancyGuard {
     
     Treasury public treasury;
+    Achievements public achievements;
     
     struct Circle {
         uint256 id;
@@ -61,8 +63,9 @@ contract Grove is ReentrancyGuard {
     event CircleCompleted(uint256 indexed circleId, uint256 totalAmount);
     event InvitationSent(uint256 indexed circleId, address indexed inviter, address indexed invitee);
     
-    constructor(address _treasury) {
+    constructor(address _treasury, address _achievements) {
         treasury = Treasury(_treasury);
+        achievements = Achievements(_achievements);
     }
     
     // ============ CIRCLE MANAGEMENT ============
@@ -146,6 +149,9 @@ contract Grove is ReentrancyGuard {
         userCircles[msg.sender].push(circleId);
         userCircleCount[msg.sender]++;
         
+        // Update achievements for joining a new circle
+        achievements.updateProgress(msg.sender, 0, true, false);
+        
         emit MemberJoined(circleId, msg.sender);
     }
     
@@ -223,6 +229,9 @@ contract Grove is ReentrancyGuard {
         userTotalContributions[msg.sender] += amount;
         lastActivityTime[msg.sender] = block.timestamp;
         
+        // Update achievements
+        achievements.updateProgress(msg.sender, amount, false, false);
+        
         emit ContributionMade(circleId, msg.sender, amount);
         
         // Check if circle is completed
@@ -283,6 +292,9 @@ contract Grove is ReentrancyGuard {
         
         invitations[circleId][invitee] = true;
         userInviteCount[msg.sender]++;
+        
+        // Update achievements for sending invitation
+        achievements.updateProgress(msg.sender, 0, false, true);
         
         emit InvitationSent(circleId, msg.sender, invitee);
     }

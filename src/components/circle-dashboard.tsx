@@ -6,8 +6,7 @@ import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import ContributeForm from "./contribute-form";
 import RecurringPaymentForm from "./recurring-payment-form";
 import InviteForm from "./invite-form";
-import InheritanceForm from "./inheritance-form";
-import InheritanceClaimForm from "./inheritance-claim-form";
+import InheritancePanel from "./inheritance-panel";
 
 import { formatBTCAmount, calculateProgress } from "@/lib/grove-contract";
 import { formatDeadline } from "@/hooks/useDashboardData";
@@ -15,12 +14,10 @@ import { formatDeadline } from "@/hooks/useDashboardData";
 export default function CircleDashboard({
   dashboardData,
   loading,
-  refresh,
   updateCircleContribution,
 }: {
   dashboardData: any;
   loading: boolean;
-  refresh: () => void;
   updateCircleContribution?: (
     circleId: string,
     contributionAmount: bigint
@@ -55,17 +52,11 @@ export default function CircleDashboard({
     circleName: string;
   }>({ isOpen: false, circleId: "", circleName: "" });
 
-  const [inheritanceModal, setInheritanceModal] = useState<{
+  const [inheritancePanel, setInheritancePanel] = useState<{
     isOpen: boolean;
     circleId: number;
-    circleName: string;
-  }>({ isOpen: false, circleId: 0, circleName: "" });
-
-  const [claimModal, setClaimModal] = useState<{
-    isOpen: boolean;
-    circleId: number;
-    deceasedAddress: string;
-  }>({ isOpen: false, circleId: 0, deceasedAddress: "" });
+    circleMembers: string[];
+  }>({ isOpen: false, circleId: 0, circleMembers: [] });
 
   const [userSchedules, setUserSchedules] = useState<any[]>([]);
   const [userContributions, setUserContributions] = useState<{
@@ -355,10 +346,10 @@ export default function CircleDashboard({
                   <button
                     className='flex-1 bg-gradient-to-r from-purple-500/20 to-purple-600/20 border border-purple-500/30 text-purple-300 py-2 px-3 rounded-lg text-sm font-medium hover:from-purple-500/30 hover:to-purple-600/30 transition-all duration-200'
                     onClick={() => {
-                      setInheritanceModal({
+                      setInheritancePanel({
                         isOpen: true,
                         circleId: circle.id,
-                        circleName: circle.name,
+                        circleMembers: circle.members?.map((m: any) => m.address) || [],
                       });
                     }}
                   >
@@ -413,12 +404,11 @@ export default function CircleDashboard({
                   <button
                     className='flex-1 bg-gradient-to-r from-yellow-500/20 to-yellow-600/20 border border-yellow-500/30 text-yellow-300 py-2 px-3 rounded-lg text-sm font-medium hover:from-yellow-500/30 hover:to-yellow-600/30 transition-all duration-200'
                     onClick={() => {
-                      // TODO: This should open a modal to select which deceased member's inheritance to claim
-                      // For now, this will need a deceased address to be provided
-                      setClaimModal({
+                      // Inheritance claiming is now handled in the inheritance panel
+                      setInheritancePanel({
                         isOpen: true,
                         circleId: circle.id,
-                        deceasedAddress: "", // This needs to be filled with actual deceased member address
+                        circleMembers: circle.members?.map((m: any) => m.address) || [],
                       });
                     }}
                   >
@@ -462,50 +452,27 @@ export default function CircleDashboard({
         />
       )}
 
-      {/* Invite Modal */}
-      {/* Inheritance Modal */}
-      {inheritanceModal.isOpen && (
-        <InheritanceForm
-          circleId={inheritanceModal.circleId}
-          onSuccess={() => {
-            refresh();
-            setTimeout(() => {
-              setInheritanceModal({
-                isOpen: false,
-                circleId: 0,
-                circleName: "",
-              });
-            }, 1500);
-          }}
-          onClose={() =>
-            setInheritanceModal({ isOpen: false, circleId: 0, circleName: "" })
-          }
-        />
-      )}
-
-      {/* Inheritance Claim Modal */}
-      {claimModal.isOpen && (
-        <InheritanceClaimForm
-          circleId={claimModal.circleId}
-          deceasedAddress={claimModal.deceasedAddress}
-          onSuccess={() => {
-            refresh();
-            setTimeout(() => {
-              setClaimModal({
-                isOpen: false,
-                circleId: 0,
-                deceasedAddress: "",
-              });
-            }, 1500);
-          }}
-          onClose={() =>
-            setClaimModal({
-              isOpen: false,
-              circleId: 0,
-              deceasedAddress: "",
-            })
-          }
-        />
+      {/* Inheritance Panel */}
+      {inheritancePanel.isOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-transparent max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-white">Inheritance Management</h2>
+                <button
+                  onClick={() => setInheritancePanel({ isOpen: false, circleId: 0, circleMembers: [] })}
+                  className="text-white/60 hover:text-white text-xl"
+                >
+                  ✕
+                </button>
+              </div>
+              <InheritancePanel
+                circleId={inheritancePanel.circleId}
+                circleMembers={inheritancePanel.circleMembers}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Circle Goal/Deadline Claim Modal - Removed for V3 */}

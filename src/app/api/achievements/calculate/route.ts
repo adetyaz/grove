@@ -20,8 +20,10 @@ export async function POST(request: NextRequest) {
     // Get user's contribution history from database
     const contributionActivities = await prisma.userActivity.findMany({
       where: {
-        userAddress: userAddress,
-        type: "contribution",
+        userWallet: userAddress,
+        activityType: {
+          in: ["contribution", "recurring_payment"],
+        },
       },
       select: {
         metadata: true,
@@ -71,18 +73,24 @@ export async function POST(request: NextRequest) {
       where: { wallet: userAddress },
       include: {
         ownedCircles: true,
-        memberCircles: true,
+      },
+    });
+
+    // Get circles user has joined via invitations
+    const acceptedInvitations = await prisma.circleInvitation.findMany({
+      where: {
+        inviterWallet: userAddress,
+        status: "ACCEPTED",
       },
     });
 
     const totalCircles = user
-      ? user.ownedCircles.length + user.memberCircles.length
+      ? user.ownedCircles.length + acceptedInvitations.length
       : 0;
 
     // Get user's streak data
     const currentStreak = user?.currentStreak || 0;
     const longestStreak = user?.longestStreak || 0;
-
 
     const invitationCount = user?.email
       ? await prisma.circleInvitation.count({
@@ -96,8 +104,8 @@ export async function POST(request: NextRequest) {
     // Get existing achievements to avoid duplicates
     const existingAchievements = await prisma.userActivity.findMany({
       where: {
-        userAddress: userAddress,
-        type: "achievement_earned",
+        userWallet: userAddress,
+        activityType: "achievement_earned",
       },
       select: {
         metadata: true,
@@ -106,7 +114,7 @@ export async function POST(request: NextRequest) {
 
     const earnedAchievementIds = new Set();
     for (const existing of existingAchievements) {
-      if (existing.metadata) {
+      if (existing.metadata && typeof existing.metadata === "string") {
         try {
           const metadata = JSON.parse(existing.metadata);
           if (metadata.achievementId !== undefined) {
@@ -200,9 +208,8 @@ export async function POST(request: NextRequest) {
       try {
         await prisma.userActivity.create({
           data: {
-            userAddress: userAddress,
-            type: "achievement_earned",
-            description: `Earned achievement: ${achievement.name}`,
+            userWallet: userAddress,
+            activityType: "achievement_earned",
             metadata: JSON.stringify({
               achievementId: achievement.id,
               achievementName: achievement.name,
@@ -240,8 +247,6 @@ export async function POST(request: NextRequest) {
       achievements,
       claimableAchievements: achievements.map((a) => a.id),
     };
-
-    
 
     return NextResponse.json(response);
   } catch (error) {

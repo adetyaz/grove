@@ -9,10 +9,9 @@ import WalletButton from "@/components/wallet-button";
 import InviteForm from "@/components/invite-form";
 import ContributeForm from "@/components/contribute-form";
 import ContributionHistory from "@/components/contribution-history";
-import GiftForm from "@/components/gift-form";
-import GiftHistory from "@/components/gift-history";
-import CircleClaimForm from "@/components/circle-claim-form";
-import VoteProgressTracker from "@/components/vote-progress-tracker";
+import VotingPanel from "@/components/voting-panel";
+
+
 import { groveToast } from "@/lib/toast";
 import {
   ArrowLeft,
@@ -75,7 +74,7 @@ export default function CircleDetailPage() {
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [showClaimModal, setShowClaimModal] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "members" | "activity" | "gifts"
+    "overview" | "members" | "activity" | "gifts" | "voting"
   >("overview");
 
   const circleId = params.id as string;
@@ -448,12 +447,13 @@ export default function CircleDetailPage() {
               { id: "members", label: "Members", icon: Users },
               { id: "activity", label: "Activity", icon: TrendingUp },
               { id: "gifts", label: "Gifts", icon: Gift },
+              { id: "voting", label: "Voting", icon: Award },
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() =>
                   setActiveTab(
-                    id as "overview" | "members" | "activity" | "gifts"
+                    id as "overview" | "members" | "activity" | "gifts" | "voting"
                   )
                 }
                 className={`flex items-center space-x-2 px-4 py-2 border-b-2 transition-all duration-300 hover-lift ${
@@ -556,21 +556,7 @@ export default function CircleDetailPage() {
                 </CardContent>
               </Card>
 
-              {/* Vote Progress Tracker - Only show for recurring circles */}
-              {circle.paymentType === "RECURRING" && (
-                <VoteProgressTracker
-                  circleId={circle.id}
-                  isOwner={
-                    circle.owner?.wallet.toLowerCase() ===
-                      address?.toLowerCase() ||
-                    circle.creator.toLowerCase() === address?.toLowerCase()
-                  }
-                  onVoteUpdate={() => {
-                    // Refresh circle data when votes are updated
-                    window.location.reload();
-                  }}
-                />
-              )}
+           
             </div>
           )}
 
@@ -648,9 +634,37 @@ export default function CircleDetailPage() {
 
           {activeTab === "gifts" && (
             <div className='animate-fade-in'>
-              <GiftHistory circleId={circle.onChainId} />
+              <Card className='bg-white/10 backdrop-blur-sm border-white/20'>
+                <CardContent className='p-8 text-center'>
+                  <div className='w-16 h-16 bg-pink-500/20 rounded-full flex items-center justify-center mx-auto mb-4'>
+                    <Gift className='w-8 h-8 text-pink-400' />
+                  </div>
+                  <h3 className='text-xl font-bold text-white mb-2'>
+                    Gifts Feature
+                  </h3>
+                  <p className='text-gray-300'>
+                    Gift functionality coming soon! Send special gifts to circle members.
+                  </p>
+                </CardContent>
+              </Card>
             </div>
           )}
+
+          {activeTab === "voting" && (
+            <div className='animate-fade-in'>
+              <VotingPanel 
+                circleId={circle.id}
+                onChainId={circle.onChainId}
+                isOwner={isCreator}
+                onRefresh={() => {
+                  // Refresh circle data after successful proposal execution
+                  window.location.reload();
+                }}
+              />
+            </div>
+          )}
+
+          
         </div>
       </div>
 
@@ -682,36 +696,7 @@ export default function CircleDetailPage() {
         />
       )}
 
-      {showGiftModal && (
-        <GiftForm
-          circleId={circle.onChainId}
-          circleName={circle.name}
-          contributionAmount={(Number(circle.currentAmount) / 1e18).toString()}
-          onClose={() => setShowGiftModal(false)}
-          onSuccess={() => {
-            setShowGiftModal(false);
-            window.location.reload();
-          }}
-        />
-      )}
-
-      {showClaimModal && (
-        <CircleClaimForm
-          circleId={circle.id}
-          onChainId={circle.onChainId}
-          circleName={circle.name}
-          currentAmount={circle.currentAmount.toString()}
-          targetAmount={circle.targetAmount.toString()}
-          deadline={circle.deadline.toString()}
-          paymentType={circle.paymentType}
-          isOwner={isCreator}
-          onClose={() => setShowClaimModal(false)}
-          onSuccess={() => {
-            setShowClaimModal(false);
-            window.location.reload();
-          }}
-        />
-      )}
+      
     </div>
   );
 }

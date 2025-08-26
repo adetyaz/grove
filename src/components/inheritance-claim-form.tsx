@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useWriteContract } from "wagmi";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { groveToast } from "@/lib/toast";
 
@@ -16,10 +17,26 @@ export default function InheritanceClaimForm({
   onSuccess,
   onClose,
 }: InheritanceClaimFormProps) {
-  const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { primaryWallet } = useDynamicConnection();
+  const { writeContractAsync } = useWriteContract();
   const address = primaryWallet?.address;
+
+  // Query inheritance status and claimable amount
+  const { data: inheritanceData, isLoading: isChecking } = useQuery({
+    queryKey: ["inheritance-claim", circleId, deceasedAddress, address],
+    queryFn: async () => {
+      if (!address) return null;
+      const response = await fetch(
+        `/api/inheritance/${circleId}/claim?deceased=${deceasedAddress}&beneficiary=${address}`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch inheritance data");
+      }
+      return response.json();
+    },
+    enabled: !!address,
+  });
 
   const claimMutation = useMutation({
     mutationFn: async () => {
@@ -27,34 +44,40 @@ export default function InheritanceClaimForm({
         throw new Error("Connect your wallet to claim inheritance.");
       }
 
-      // TODO: Implement Grove V3 inheritance claiming
-      // For now, this is a placeholder that will need Grove V3 inheritance contract integration
-
-      // Simulate Grove V3 inheritance check
-      const mockIsActive = true;
-      const mockIsBeneficiary = true;
-      const mockAlreadyClaimed = false;
-
-      if (!mockIsActive) {
-        throw new Error(
-          "Inheritance has not been activated for this member yet."
-        );
+      if (!inheritanceData?.isActive) {
+        throw new Error("Inheritance has not been activated for this member yet.");
       }
 
-      if (!mockIsBeneficiary) {
-        throw new Error("You are not a beneficiary of this inheritance.");
+      if (inheritanceData?.claimableAmount === "0") {
+        throw new Error("You have no inheritance to claim or have already claimed.");
       }
 
-      if (mockAlreadyClaimed) {
-        throw new Error("You have already claimed your inheritance share.");
+      // Get transaction data from API
+      const response = await fetch(`/api/inheritance/${circleId}/claim`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deceasedAddress,
+          beneficiaryAddress: address,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to prepare claim transaction");
       }
 
-      // TODO: Implement actual Grove V3 inheritance claim transaction
-      // This should use INHERITANCE_CONTRACT_ADDRESS and INHERITANCE_ABI from lib/contracts.ts
-      console.log("Grove V3 inheritance claim - placeholder implementation");
+      const { transactionData } = await response.json();
 
-      // Simulate successful claim
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Execute the contract transaction
+      const txHash = await writeContractAsync({
+        address: transactionData.contractAddress as `0x${string}`,
+        abi: transactionData.abi,
+        functionName: transactionData.functionName,
+        args: transactionData.args,
+      });
+      
+      return txHash;
     },
     onSuccess: () => {
       groveToast.success("Inheritance claimed successfully!");
@@ -69,36 +92,9 @@ export default function InheritanceClaimForm({
     },
   });
 
-  const checkInheritance = async () => {
-    if (!address) {
-      groveToast.error("Connect your wallet first");
-      return;
-    }
-
-    setIsChecking(true);
-    try {
-      // TODO: Implement Grove V3 inheritance checking
-      // This should use INHERITANCE_CONTRACT_ADDRESS and INHERITANCE_ABI from lib/contracts.ts
-
-      // Simulate Grove V3 inheritance check
-      const mockIsActive = true;
-      const mockAmount = BigInt(1000000); // 1M sats
-      const mockIsBeneficiary = true;
-
-      if (!mockIsActive) {
-        groveToast.info("Inheritance not yet activated for this member");
-      } else if (!mockIsBeneficiary) {
-        groveToast.error("You are not a beneficiary of this inheritance");
-      } else {
-        groveToast.success(
-          `Inheritance active. Total amount: ${mockAmount.toString()} sats`
-        );
-      }
-    } catch (error: any) {
-      groveToast.error(`Error checking inheritance: ${error.message}`);
-    } finally {
-      setIsChecking(false);
-    }
+  const formatAmount = (amount: string) => {
+    if (!amount || amount === "0") return "0";
+    return (parseInt(amount) / 100000000).toFixed(8); // Convert sats to BTC
   };
 
   return (
@@ -114,16 +110,52 @@ export default function InheritanceClaimForm({
           <p className='text-white/80'>
             <strong>Deceased Member:</strong> {deceasedAddress}
           </p>
+          
+          {/* Inheritance Status Display */}
+          {inheritanceData && (
+            <div className='bg-white/5 rounded-lg p-4 border border-white/20'>
+              <div className='space-y-2'>
+                <div className='flex justify-between'>
+                  <span className='text-white/70'>Status:</span>
+                  <span className={inheritanceData.isActive ? 'text-green-400' : 'text-red-400'}>
+                    {inheritanceData.isActive ? 'Active' : 'Not Active'}
+                  </span>
+                </div>
+                {inheritanceData.isActive && (
+                  <>
+                    <div className='flex justify-between'>
+                      <span className='text-white/70'>Total Amount:</span>
+                      <span className='text-white'>{formatAmount(inheritanceData.totalAmount)} BTC</span>
+                    </div>
+                    <div className='flex justify-between'>
+                      <span className='text-white/70'>Your Claimable:</span>
+                      <span className='text-green-400 font-semibold'>
+                        {formatAmount(inheritanceData.claimableAmount)} BTC
+                      </span>
+                    </div>
+                    {inheritanceData.activationReason && (
+                      <div className='flex justify-between'>
+                        <span className='text-white/70'>Reason:</span>
+                        <span className='text-white/80'>{inheritanceData.activationReason}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className='space-y-4'>
-          <button
-            onClick={checkInheritance}
-            disabled={isChecking}
-            className='w-full px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 font-semibold transition-colors'
-          >
-            {isChecking ? "Checking..." : "Check Inheritance Status"}
-          </button>
+          {!inheritanceData && (
+            <button
+              onClick={() => window.location.reload()}
+              disabled={isChecking}
+              className='w-full px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 font-semibold transition-colors'
+            >
+              {isChecking ? "Checking..." : "Check Inheritance Status"}
+            </button>
+          )}
 
           {error && (
             <div className='bg-red-500/20 border border-red-500/30 rounded-lg p-3 text-red-200 text-sm'>
@@ -142,7 +174,7 @@ export default function InheritanceClaimForm({
             </button>
             <button
               onClick={() => claimMutation.mutate()}
-              disabled={claimMutation.isPending}
+              disabled={claimMutation.isPending || !inheritanceData?.isActive || inheritanceData?.claimableAmount === "0"}
               className='flex-1 py-3 px-4 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:opacity-50 text-white rounded-lg font-semibold transition-all duration-200'
             >
               {claimMutation.isPending ? "Claiming..." : "Claim My Inheritance"}

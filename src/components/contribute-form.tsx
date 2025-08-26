@@ -8,7 +8,12 @@ import { groveToast } from "@/lib/toast";
 import { formatBtcAmount } from "@/lib/btc-conversion";
 
 import { useWriteContract, useReadContract } from "wagmi";
-import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/lib/contracts";
+import { 
+  GROVE_CONTRACT_ADDRESS, 
+  GROVE_ABI,
+  TREASURY_CONTRACT_ADDRESS,
+  TREASURY_ABI 
+} from "@/lib/contracts";
 
 interface ContributeFormProps {
   circleId: string;
@@ -35,6 +40,8 @@ export default function ContributeForm({
   onRefresh,
 }: ContributeFormProps) {
   const [amount, setAmount] = useState("");
+  const [depositAmount, setDepositAmount] = useState("");
+  const [showDepositSection, setShowDepositSection] = useState(false);
   const [timeoutReached, setTimeoutReached] = useState(false);
   const [hash, setHash] = useState<string | undefined>(undefined);
   const { primaryWallet, isConnected } = useDynamicConnection();
@@ -45,6 +52,7 @@ export default function ContributeForm({
 
   const { writeContractAsync } = useWriteContract();
 
+  // Check if user is a member
   const {
     data: isMember,
     isLoading: isLoadingMembership,
@@ -61,6 +69,60 @@ export default function ContributeForm({
     },
   });
 
+  // Check user's vault balance
+  const {
+    data: vaultData,
+    isLoading: isLoadingVault,
+    refetch: refetchVault,
+  } = useReadContract({
+    address: TREASURY_CONTRACT_ADDRESS,
+    abi: TREASURY_ABI,
+    functionName: "getUserVault",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address,
+      retry: 3,
+      staleTime: 1000 * 30, // 30 seconds
+    },
+  });
+
+  // Deposit mutation for vault
+  const depositMutation = useMutation({
+    mutationFn: async (depositAmount: string) => {
+      if (!address || !depositAmount) {
+        throw new Error("Please enter a valid deposit amount");
+      }
+
+      const depositValue = parseEther(depositAmount);
+      groveToast.info("Depositing to vault...");
+
+      try {
+        const txHash = await writeContractAsync({
+          address: TREASURY_CONTRACT_ADDRESS,
+          abi: TREASURY_ABI,
+          functionName: "depositToVault",
+          args: [],
+          value: depositValue,
+        });
+
+        groveToast.transactionPending(txHash);
+        
+        // Wait for transaction and refresh vault data
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        refetchVault();
+        
+        groveToast.transactionSuccess(txHash);
+        setDepositAmount("");
+        
+        return txHash;
+      } catch (error: any) {
+        const errorMessage = error?.message || "Deposit failed";
+        groveToast.error(errorMessage);
+        throw error;
+      }
+    },
+  });
+
   const mutation = useMutation({
     mutationFn: async () => {
       if (!address || !amount) {
@@ -73,22 +135,35 @@ export default function ContributeForm({
         );
       }
 
-      setTimeoutReached(false);
+      const contributionAmount = parseEther(amount);
 
+      // Check if user has sufficient vault balance
+      if (vaultData) {
+        const [, availableBalance] = vaultData as [bigint, bigint, bigint, bigint, bigint];
+        if (availableBalance < contributionAmount) {
+          throw new Error(
+            `Insufficient vault balance. You have ${formatBtcAmount(availableBalance.toString())} BTC available, but need ${formatBtcAmount(contributionAmount.toString())} BTC. Please deposit more funds to your vault first.`
+          );
+        }
+      }
+
+      setTimeoutReached(false);
       groveToast.info("Processing contribution...");
 
       try {
+        // Call Grove contract's contribute function with amount parameter
         const txHash = await writeContractAsync({
           address: GROVE_CONTRACT_ADDRESS,
           abi: GROVE_ABI,
           functionName: "contribute",
-          args: [BigInt(onChainId)],
-          value: parseEther(amount),
+          args: [BigInt(onChainId), contributionAmount], // Correct: circleId, amount
+          value: BigInt(0), // No ETH sent directly - using vault funds
         });
 
         setHash(txHash);
         groveToast.transactionPending(txHash);
 
+        // Wait for transaction confirmation
         await new Promise((resolve) => setTimeout(resolve, 5000));
       } catch (contractError: any) {
         const errorMessage =
@@ -106,9 +181,15 @@ export default function ContributeForm({
           throw new Error("Transaction was cancelled by user.");
         }
 
-        if (errorMessage.includes("insufficient funds")) {
+        if (errorMessage.includes("Insufficient vault balance")) {
           throw new Error(
-            "Insufficient funds. Please check your wallet balance and try again."
+            "Insufficient funds in your vault. Please deposit more funds first."
+          );
+        }
+
+        if (errorMessage.includes("Wrong contribution amount")) {
+          throw new Error(
+            "Invalid contribution amount. Please check the required amount for this circle."
           );
         }
 
@@ -147,8 +228,10 @@ export default function ContributeForm({
 
       const contributionAmount = parseEther(amount);
 
+      // Track contribution and trigger achievement check directly in frontend
       try {
-        await fetch("/api/contribution/log", {
+        // Track the contribution activity first
+        await fetch("/api/activity/track-contribution", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -157,10 +240,11 @@ export default function ContributeForm({
             amount,
             txHash: hash,
             circleName,
+            isRecurring: isRecurringCircle,
           }),
         });
       } catch (logError) {
-        console.warn("Failed to log contribution:", logError);
+        console.warn("Failed to track contribution:", logError);
       }
 
       // Track contribution and trigger achievement check directly in frontend
@@ -361,7 +445,69 @@ export default function ContributeForm({
             </button>
           </div>
         ) : isMember && onChainId && onChainId > 0 && isConnected && address ? (
-          <form onSubmit={handleSubmit} className='space-y-6'>
+          <div className='space-y-6'>
+            {/* Vault Balance Section */}
+            {vaultData && (
+              <div className='bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4'>
+                <div className='flex items-center justify-between mb-2'>
+                  <span className='text-emerald-300 font-semibold flex items-center'>
+                    <span className='mr-2'>🏦</span>
+                    Vault Balance
+                  </span>
+                  <button
+                    type='button'
+                    onClick={() => setShowDepositSection(!showDepositSection)}
+                    className='text-xs text-emerald-300 hover:text-emerald-200 underline'
+                  >
+                    {showDepositSection ? 'Hide Deposit' : 'Add Funds'}
+                  </button>
+                </div>
+                <div className='grid grid-cols-2 gap-4 text-sm'>
+                  <div>
+                    <span className='text-gray-400 block'>Available:</span>
+                    <span className='text-white font-mono'>
+                      {formatBtcAmount((vaultData[1] as bigint).toString())} BTC
+                    </span>
+                  </div>
+                  <div>
+                    <span className='text-gray-400 block'>Locked:</span>
+                    <span className='text-white font-mono'>
+                      {formatBtcAmount((vaultData[2] as bigint).toString())} BTC
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Deposit Section */}
+                {showDepositSection && (
+                  <div className='mt-4 pt-4 border-t border-emerald-500/20'>
+                    <div className='space-y-3'>
+                      <label className='block text-sm font-medium text-emerald-300'>
+                        Deposit Amount (BTC)
+                      </label>
+                      <input
+                        type='number'
+                        step='0.0001'
+                        min='0'
+                        value={depositAmount}
+                        onChange={(e) => setDepositAmount(e.target.value)}
+                        className='w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-300'
+                        placeholder='0.001'
+                      />
+                      <button
+                        type='button'
+                        onClick={() => depositMutation.mutate(depositAmount)}
+                        disabled={!depositAmount || depositMutation.isPending}
+                        className='w-full py-2 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-all duration-300'
+                      >
+                        {depositMutation.isPending ? 'Depositing...' : 'Deposit to Vault'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className='space-y-6'>
             {/* Circle Payment Type Info */}
             <div className='bg-blue-500/10 border border-blue-500/20 rounded-lg p-4'>
               <div className='flex items-center space-x-2 mb-2'>
@@ -449,7 +595,8 @@ export default function ContributeForm({
                 </div>
               </div>
             )}
-          </form>
+            </form>
+          </div>
         ) : null}
       </div>
     </div>

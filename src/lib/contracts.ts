@@ -10,25 +10,21 @@ export const VOTING_CONTRACT_ADDRESS =
   "0x958698Ef5e9F8B1f926E8aE93AEF0d03DDb28704";
 export const INHERITANCE_CONTRACT_ADDRESS =
   "0xFeb5a4515436d4F411B62b615D6DF333B34AF6c4";
-export const GIFTS_CONTRACT_ADDRESS =
-  "0xC02594Bc750db60A05095bF312C7C85F8cf16837";
 export const ACHIEVEMENTS_CONTRACT_ADDRESS =
   "0x1B92C1F5DB409C8E3E37E5132de3fAF11d73C562";
 
 // Contract ABIs
-import TREASURY_ABI from "../contracts/abis/Treasury.json";
-import GROVE_ABI from "../contracts/abis/Grove.json";
-import VOTING_ABI from "../contracts/abis/Voting.json";
-import INHERITANCE_ABI from "../contracts/abis/Inheritance.json";
-import GIFTS_ABI from "../contracts/abis/Gifts.json";
-import ACHIEVEMENTS_ABI from "../contracts/abis/Achievements.json";
+import TREASURY_ABI from "../contracts/ABIs/Treasury.json";
+import GROVE_ABI from "../contracts/ABIs/Grove.json";
+import VOTING_ABI from "../contracts/ABIs/Voting.json";
+import INHERITANCE_ABI from "../contracts/ABIs/Inheritance.json";
+import ACHIEVEMENTS_ABI from "../contracts/ABIs/Achievements.json";
 
 export {
   TREASURY_ABI,
   GROVE_ABI,
   VOTING_ABI,
   INHERITANCE_ABI,
-  GIFTS_ABI,
   ACHIEVEMENTS_ABI,
 };
 

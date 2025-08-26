@@ -7,139 +7,89 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// User profiles - needed because blockchain doesn't store emails
 model User {
   id                 String    @id @default(uuid())
-  email              String    @unique
-  name               String?
-  wallet             String    @unique
+  wallet             String    @unique            // From Dynamic wallet connection
+  email              String    @unique            // From Dynamic for email invitations
+  name               String?                      // Display name from Dynamic
   createdAt          DateTime  @default(now())
+  
+  // Streak tracking (calculated from UserActivity)
   currentStreak      Int       @default(0)
   longestStreak      Int       @default(0)
   lastActivityDate   DateTime?
+  
+  // Stats (calculated from blockchain events)
   totalContributions Int       @default(0)
-  totalSaved         String    @default("0")
+  totalSaved         String    @default("0")     // BigInt as string
   invitedMembers     Int       @default(0)
   circlesCompleted   Int       @default(0)
+  
+  // Relations
   ownedCircles       Circle[]  @relation("CircleOwner")
-  memberCircles      Circle[]  @relation("CircleMembers")
+  invitations        CircleInvitation[]
 }
 
+// Cache blockchain circle data for UI performance
 model Circle {
   id                   String             @id @default(uuid())
+  onChainId            Int?               @unique  // From Grove.sol after creation
+  transactionHash      String?                     // Circle creation tx
+  
+  // Smart contract data (synced from Grove.sol)
   name                 String
   description          String?
-  targetAmount         String
-  contributionAmount   String
-  contributionInterval String
-  durationDays         String
+  targetAmount         String                      // BigInt as string
+  contributionAmount   String                      // BigInt as string
+  contributionInterval String                      // Seconds as string
+  durationDays         String                      // Days as string
   isPublic             Boolean            @default(false)
-  transactionHash      String?
+  
+  // Database specific
   ownerId              String
-  onChainId            Int?               @unique
-  contractAddress      String?
-  syncStatus           String             @default("PENDING")
+  syncStatus           String             @default("PENDING") // PENDING, SYNCED, FAILED
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
+  
+  // Relations
   owner                User               @relation("CircleOwner", fields: [ownerId], references: [id])
   invitations          CircleInvitation[]
-  invites              Invite[]
-  PaymentSchedule      PaymentSchedule[]
-  members              User[]             @relation("CircleMembers")
 }
 
-model Invite {
-  id        String   @id @default(uuid())
-  circleId  String
-  email     String
-  token     String   @unique
-  expiresAt DateTime
-  claimed   Boolean  @default(false)
-  circle    Circle   @relation(fields: [circleId], references: [id])
-}
-
+// Email invitations (before blockchain join)
 model CircleInvitation {
-  id                      String    @id @default(uuid())
-  circleId                String
-  inviterEmail            String
-  inviteeEmail            String?
-  inviteeWalletAddress    String?
-  inviteType              String
-  status                  String    @default("PENDING")
-  expiresAt               DateTime
-  createdAt               DateTime  @default(now())
-  acceptedAt              DateTime?
-  acceptedByEmail         String?
-  acceptedByWalletAddress String?
-  circle                  Circle    @relation(fields: [circleId], references: [id])
-
-  @@index([inviteeEmail])
-  @@index([inviteeWalletAddress])
-  @@index([circleId])
-}
-
-model UserActivity {
-  id          String   @id @default(uuid())
-  userAddress String
-  type        String
-  description String?
-  metadata    String?
-  timestamp   DateTime @default(now())
-
-  @@index([userAddress])
-  @@index([type])
-  @@index([timestamp])
-}
-
-model PaymentSchedule {
-  id               String             @id @default(uuid())
-  userAddress      String
-  circleId         String
-  amount           String
-  frequency        String
-  nextPaymentDate  DateTime
-  lastPaymentDate  DateTime?
-  isActive         Boolean            @default(true)
-  totalPayments    Int                @default(0)
-  maxPayments      Int?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  Circle           Circle             @relation(fields: [circleId], references: [id])
-  RecurringPayment RecurringPayment[]
-
-  @@index([circleId])
-  @@index([isActive])
-  @@index([nextPaymentDate])
-  @@index([userAddress])
-}
-
-model RecurringPayment {
-  id              String          @id @default(uuid())
-  scheduleId      String
-  userAddress     String
+  id              String    @id @default(uuid())
   circleId        String
-  amount          String
-  status          String
-  transactionHash String?
-  scheduledFor    DateTime
-  processedAt     DateTime?
-  failureReason   String?
-  retryCount      Int             @default(0)
-  createdAt       DateTime        @default(now())
-  PaymentSchedule PaymentSchedule @relation(fields: [scheduleId], references: [id])
-
-  @@index([scheduleId])
-  @@index([scheduledFor])
-  @@index([status])
-  @@index([userAddress])
+  inviterWallet   String     // Who sent invitation
+  recipientEmail  String     // Email to invite
+  token           String     @unique  // Unique invite link token
+  status          String     @default("PENDING") // PENDING, ACCEPTED, EXPIRED
+  expiresAt       DateTime
+  createdAt       DateTime  @default(now())
+  acceptedAt      DateTime?
+  
+  // Relations
+  circle          Circle    @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  inviter         User      @relation(fields: [inviterWallet], references: [wallet])
+  
+  @@index([recipientEmail])
+  @@index([circleId])
 }
 
-model StreakData {
-  id               String    @id @default(uuid())
-  userAddress      String    @unique
-  currentStreak    Int       @default(0)
-  longestStreak    Int       @default(0)
-  lastActivityDate DateTime?
-  streakType       String    @default("CONTRIBUTION")
-
-  @@index([userAddress])
+// Cache blockchain events for dashboard/leaderboard
+model UserActivity {
+  id              String   @id @default(uuid())
+  userWallet      String                        // User's wallet address
+  activityType    String                        // "contribution", "circle_joined", "circle_created"
+  circleId        String?                       // Related circle (if applicable)
+  amount          String?                       // Amount for contributions (BigInt as string)
+  transactionHash String?                       // Blockchain transaction hash
+  blockNumber     String?                       // Block number for ordering
+  timestamp       DateTime @default(now())
+  metadata        Json?                         // Additional activity data
+  
+  @@index([userWallet])
+  @@index([activityType])
+  @@index([timestamp])
 }

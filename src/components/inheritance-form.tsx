@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useWriteContract } from "wagmi";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { groveToast } from "@/lib/toast";
 
@@ -21,9 +23,91 @@ export default function InheritanceForm({
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([
     { beneficiary: "", share: "" },
   ]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
   const { primaryWallet } = useDynamicConnection();
+  const { writeContractAsync } = useWriteContract();
   const address = primaryWallet?.address;
+
+  // Fetch existing beneficiaries
+  const { data: existingBeneficiaries } = useQuery({
+    queryKey: ["inheritance-beneficiaries", circleId, address],
+    queryFn: async () => {
+      if (!address) return null;
+      const response = await fetch(
+        `/api/inheritance/${circleId}/beneficiaries?member=${address}`
+      );
+      if (!response.ok) return null;
+      return response.json();
+    },
+    enabled: !!address,
+  });
+
+  // Load existing beneficiaries when data is available
+  useEffect(() => {
+    if (existingBeneficiaries?.beneficiaries?.length > 0) {
+      setBeneficiaries(
+        existingBeneficiaries.beneficiaries.map((b: any) => ({
+          beneficiary: b.beneficiary,
+          share: b.share.toString(),
+        }))
+      );
+    }
+  }, [existingBeneficiaries]);
+
+  const setBeneficiariesMutation = useMutation({
+    mutationFn: async (beneficiariesData: Beneficiary[]) => {
+      if (!address) {
+        throw new Error("Connect your wallet to set beneficiaries.");
+      }
+
+      // Validate total shares
+      const totalShares = beneficiariesData.reduce(
+        (sum, b) => sum + parseInt(b.share || "0"),
+        0
+      );
+      if (totalShares !== 10000) {
+        throw new Error("Total shares must equal 10000 (100%)");
+      }
+
+      // Get transaction data from API
+      const response = await fetch(`/api/inheritance/${circleId}/beneficiaries`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          beneficiaries: beneficiariesData,
+          userAddress: address,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to prepare transaction");
+      }
+
+      const { transactionData } = await response.json();
+
+      // Execute the contract transaction
+      const txHash = await writeContractAsync({
+        address: transactionData.contractAddress as `0x${string}`,
+        abi: transactionData.abi,
+        functionName: transactionData.functionName,
+        args: transactionData.args,
+      });
+      
+      return txHash;
+    },
+    onSuccess: () => {
+      groveToast.success("Beneficiaries set successfully!");
+      onSuccess?.();
+      onClose?.();
+    },
+    onError: (error: any) => {
+      groveToast.error(
+        "Failed to set beneficiaries: " +
+          (error?.message || error?.toString() || "Unknown error")
+      );
+    },
+  });
 
   const handleChange = (
     idx: number,
@@ -37,15 +121,30 @@ export default function InheritanceForm({
 
   const addBeneficiary = () =>
     setBeneficiaries((prev) => [...prev, { beneficiary: "", share: "" }]);
+  
   const removeBeneficiary = (idx: number) =>
     setBeneficiaries((prev) => prev.filter((_, i) => i !== idx));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement Grove V3 inheritance system
-    groveToast.info("Grove V3 inheritance system coming soon!");
-    onClose?.();
+    
+    // Validate beneficiaries
+    const validBeneficiaries = beneficiaries.filter(
+      (b) => b.beneficiary.trim() && b.share.trim()
+    );
+    
+    if (validBeneficiaries.length === 0) {
+      groveToast.error("Please add at least one beneficiary");
+      return;
+    }
+
+    await setBeneficiariesMutation.mutateAsync(validBeneficiaries);
   };
+
+  const totalShares = beneficiaries.reduce(
+    (sum, b) => sum + (parseInt(b.share) || 0),
+    0
+  );
 
   return (
     <div className='fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50'>
@@ -88,25 +187,41 @@ export default function InheritanceForm({
           <button
             type='button'
             onClick={addBeneficiary}
-            className='text-blue-400'
+            className='text-blue-400 hover:text-blue-300'
           >
             + Add Beneficiary
           </button>
+          
+          {/* Total shares display */}
+          <div className='bg-white/5 rounded-lg p-3 border border-white/20'>
+            <div className='text-sm text-white/70'>Total Shares:</div>
+            <div className={`text-lg font-semibold ${
+              totalShares === 10000 ? 'text-green-400' : 
+              totalShares > 10000 ? 'text-red-400' : 'text-yellow-400'
+            }`}>
+              {totalShares} / 10000 ({(totalShares / 100).toFixed(1)}%)
+            </div>
+            {totalShares !== 10000 && (
+              <div className='text-xs text-white/60 mt-1'>
+                {totalShares > 10000 ? 'Exceeds 100%' : 'Must equal 100%'}
+              </div>
+            )}
+          </div>
           <div className='flex space-x-4 mt-4'>
             <button
               type='button'
               onClick={onClose}
               className='flex-1 py-3 px-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold'
-              disabled={isLoading}
+              disabled={isLoading || setBeneficiariesMutation.isPending}
             >
               Cancel
             </button>
             <button
               type='submit'
-              disabled={isLoading}
+              disabled={isLoading || setBeneficiariesMutation.isPending || totalShares !== 10000}
               className='flex-1 py-3 px-4 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:opacity-50 text-white rounded-lg font-semibold'
             >
-              {isLoading ? "Setting..." : "Set Beneficiaries"}
+              {setBeneficiariesMutation.isPending ? "Setting..." : "Set Beneficiaries"}
             </button>
           </div>
         </form>

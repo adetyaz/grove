@@ -16,8 +16,10 @@ export interface ActivityMetadata {
   circleName?: string;
   circleId?: string;
   achievementName?: string;
+  achievementId?: string;
   inviteeEmail?: string;
   recipient?: string;
+  message?: string;
   txHash?: string;
   [key: string]: any;
 }
@@ -25,16 +27,14 @@ export interface ActivityMetadata {
 export async function logUserActivity(
   userAddress: string,
   type: ActivityType,
-  description: string,
   metadata?: ActivityMetadata
 ) {
   try {
     await prisma.userActivity.create({
       data: {
-        userAddress: userAddress.toLowerCase(),
-        type,
-        description,
-        metadata: metadata ? JSON.stringify(metadata) : null,
+        userWallet: userAddress.toLowerCase(),
+        activityType: type,
+        metadata: metadata || {},
       },
     });
     console.log(`Activity logged: ${type} for ${userAddress}`);
@@ -53,7 +53,6 @@ export async function logContribution(
   await logUserActivity(
     userAddress,
     "contribution",
-    `Contributed ${amount} BTC to ${circleName}`,
     {
       amount,
       circleName,
@@ -75,10 +74,6 @@ export async function logGift(
   await logUserActivity(
     senderAddress,
     "gift_sent",
-    `Sent ${amount} BTC gift to ${recipientAddress.slice(
-      0,
-      6
-    )}...${recipientAddress.slice(-4)} in ${circleName}`,
     {
       amount,
       circleName,
@@ -98,7 +93,6 @@ export async function logCircleCreation(
   await logUserActivity(
     userAddress,
     "circle_created",
-    `Created new savings circle "${circleName}"`,
     {
       circleName,
       circleId,
@@ -114,7 +108,6 @@ export async function logCircleJoin(
   await logUserActivity(
     userAddress,
     "circle_joined",
-    `Joined savings circle "${circleName}"`,
     {
       circleName,
       circleId,
@@ -130,7 +123,6 @@ export async function logAchievement(
   await logUserActivity(
     userAddress,
     "achievement",
-    `Earned achievement: ${achievementName}`,
     {
       achievementName,
       achievementId,
