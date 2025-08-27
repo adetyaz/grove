@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { createPublicClient, http } from "viem";
-import { citreaTestnet } from "viem/chains";
-import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/lib/contracts";
 
 // Utility function to parse circle description that might be JSON
 const parseCircleDescription = (description: string | null): string => {
@@ -60,41 +57,69 @@ export async function GET(
     if (!circle) {
       return NextResponse.json({ error: "Circle not found" }, { status: 404 });
     }
-    // Get real blockchain data if circle is deployed
-    let currentAmount = "0";
+    // Get real member list from UserActivity (where joins are logged)
     let memberCount = 1; // Creator is always a member
-    let members: string[] = [circle.owner.wallet];
+    const members: string[] = [circle.owner.wallet];
+    const currentAmount = "0"; // Current amount from contributions
 
-    if (circle.onChainId) {
-      try {
-        const publicClient = createPublicClient({
-          chain: citreaTestnet,
-          transport: http(),
-        });
+    // Get all users who joined this circle from UserActivity
+    const joinActivities = await prisma.userActivity.findMany({
+      where: {
+        type: "circle_joined",
+        metadata: {
+          contains: `"circleId":"${circleId}"`,
+        },
+      },
+      select: {
+        userAddress: true,
+      },
+    });
 
-        // Get circle data from blockchain (single call)
-        const circleData = (await publicClient.readContract({
-          address: GROVE_CONTRACT_ADDRESS,
-          abi: GROVE_ABI,
-          functionName: "getCircle",
-          args: [BigInt(circle.onChainId)],
-        })) as any[];
-
-        // Extract data from contract response
-        // Index 11 is members array
-        members = (circleData[11] as string[]) || [circle.owner.wallet];
-        memberCount = members.length;
-
-        // Current amount calculation - for now use 0
-        currentAmount = "0"; // TODO: Calculate from contributions
-      } catch (error) {
-        console.error(
-          `Error fetching blockchain data for circle ${circle.onChainId}:`,
-          error
-        );
-        // Keep default values if blockchain call fails
+    // Add joined members to the list (avoid duplicates)
+    joinActivities.forEach((activity) => {
+      const userAddress = activity.userAddress;
+      if (!members.some(addr => addr.toLowerCase() === userAddress.toLowerCase())) {
+        members.push(userAddress);
       }
-    }
+    });
+
+    memberCount = members.length;
+
+    // Get contribution activities for this circle
+    const contributionActivities = await prisma.userActivity.findMany({
+      where: {
+        type: "contribution",
+        metadata: {
+          contains: `"circleId":"${circleId}"`,
+        },
+      },
+      orderBy: {
+        timestamp: "desc",
+      },
+    });
+
+    // Parse contributions from activities
+    const contributions = contributionActivities.map((activity) => {
+      try {
+        const metadata = JSON.parse(activity.metadata || "{}");
+        return {
+          id: activity.id,
+          amount: metadata.amount || "0",
+          contributor: activity.userAddress,
+          timestamp: Math.floor(activity.timestamp.getTime() / 1000),
+          txHash: metadata.txHash || "",
+        };
+      } catch (error) {
+        console.error("Error parsing contribution metadata:", error);
+        return {
+          id: activity.id,
+          amount: "0",
+          contributor: activity.userAddress,
+          timestamp: Math.floor(activity.timestamp.getTime() / 1000),
+          txHash: "",
+        };
+      }
+    });
 
     // Return circle data with proper format expected by frontend
     const circleData = {
@@ -102,22 +127,19 @@ export async function GET(
       onChainId: circle.onChainId || 0,
       name: circle.name,
       description: parseCircleDescription(circle.description),
-      targetAmount: BigInt(circle.targetAmount),
-      currentAmount: BigInt(currentAmount),
-      deadline: BigInt(
-        Math.floor(Date.now() / 1000) +
-          parseInt(circle.durationDays) * 24 * 60 * 60
-      ),
+      targetAmount: circle.targetAmount, // Raw string from DB
+      currentAmount: currentAmount,
+      deadline: Math.floor(Date.now() / 1000) + parseInt(circle.durationDays) * 24 * 60 * 60, // Unix timestamp as number
       isActive: circle.syncStatus === "SYNCED",
       syncStatus: circle.syncStatus,
       memberCount,
       members,
       creator: circle.owner.wallet,
       paymentType: circle.isPublic ? "public" : "private",
-      contributionAmount: BigInt(circle.contributionAmount),
+      contributionAmount: circle.contributionAmount, // Raw string from DB
       createdAt: circle.createdAt.toISOString(),
       owner: circle.owner,
-      contributions: [], // TODO: Fetch real contributions from blockchain events
+      contributions,
     };
 
     return NextResponse.json({ circle: circleData });

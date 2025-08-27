@@ -60,11 +60,27 @@ export default function DiscoverPage() {
 
   const isUserMember = (circle: PublicCircle) => {
     if (!primaryWallet?.address) return false;
-    return (
+
+    // Check if user is the owner
+    const isOwner =
+      circle.owner?.wallet?.toLowerCase() ===
+      primaryWallet.address?.toLowerCase();
+
+    // Check if user is a member
+    const isMember =
       circle.members?.some(
         (member) =>
           member.toLowerCase() === primaryWallet.address?.toLowerCase()
-      ) || false
+      ) || false;
+
+    return isOwner || isMember;
+  };
+
+  const isUserOwner = (circle: PublicCircle) => {
+    if (!primaryWallet?.address) return false;
+    return (
+      circle.owner?.wallet?.toLowerCase() ===
+      primaryWallet.address?.toLowerCase()
     );
   };
 
@@ -221,7 +237,14 @@ export default function DiscoverPage() {
                   </div>
 
                   {/* Join Button or Member Status */}
-                  {isUserMember(circle) ? (
+                  {isUserOwner(circle) ? (
+                    <Button
+                      className='w-full bg-gradient-to-r from-orange-600 to-amber-600 text-white font-semibold cursor-default'
+                      disabled
+                    >
+                      ✓ Your Circle
+                    </Button>
+                  ) : isUserMember(circle) ? (
                     <Button
                       className='w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold cursor-default'
                       disabled

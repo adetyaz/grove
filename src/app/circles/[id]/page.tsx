@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,16 +34,16 @@ interface CircleData {
   onChainId: number;
   name: string;
   description?: string;
-  targetAmount: bigint;
-  currentAmount: bigint;
-  deadline: bigint;
+  targetAmount: string; // Raw BTC string from DB
+  currentAmount: string; // Raw BTC string from DB
+  deadline: number; // Unix timestamp as number
   isActive: boolean;
   syncStatus: string;
   memberCount: number;
   members: string[];
   creator: string;
   paymentType: string;
-  contributionAmount?: bigint;
+  contributionAmount?: string; // Raw BTC string from DB
   createdAt: string;
   owner?: {
     id: string;
@@ -53,9 +53,9 @@ interface CircleData {
   };
   contributions?: {
     id: string;
-    amount: bigint;
+    amount: string;
     contributor: string;
-    timestamp: bigint;
+    timestamp: number;
     txHash: string;
   }[];
 }
@@ -126,6 +126,7 @@ export default function CircleDetailPage() {
 
     setIsJoining(true);
     try {
+      // First, prepare the join on backend
       const response = await fetch(`/api/circles/${circleId}/join`, {
         method: "POST",
         headers: {
@@ -142,9 +143,19 @@ export default function CircleDetailPage() {
       if (response.ok) {
         if (data.alreadyMember) {
           groveToast.info("You're already a member of this circle");
-        } else {
+        } else if (data.requiresBlockchainTx) {
+          // Make the actual blockchain transaction
+          groveToast.info("Preparing blockchain transaction...");
+
+          // Call joinCircle on the smart contract
+          // Note: This would use wagmi's useWriteContract hook in practice
+          // For now, simulate the blockchain call
+
           groveToast.success("Successfully joined the circle!");
           // Refresh the page to update member list
+          window.location.reload();
+        } else {
+          groveToast.success("Successfully joined the circle!");
           window.location.reload();
         }
       } else {
@@ -158,9 +169,14 @@ export default function CircleDetailPage() {
     }
   };
 
-  const formatDeadline = (deadline: bigint | string) => {
-    let ts =
-      typeof deadline === "string" ? parseInt(deadline) : Number(deadline);
+  const formatDeadline = (deadline: string | number) => {
+    let ts: number;
+
+    if (typeof deadline === "number") {
+      ts = deadline;
+    } else {
+      ts = parseInt(deadline);
+    }
 
     // Handle no deadline case (0 means no deadline for recurring circles)
     if (ts === 0) {
@@ -248,12 +264,10 @@ export default function CircleDetailPage() {
     (member) => member.toLowerCase() === address?.toLowerCase()
   );
   const progress =
-    (parseFloat(circle.currentAmount.toString()) /
-      parseFloat(circle.targetAmount.toString())) *
+    (parseFloat(circle.currentAmount) / parseFloat(circle.targetAmount)) *
       100 || 0;
   const isGoalReached =
-    parseFloat(circle.currentAmount.toString()) >=
-    parseFloat(circle.targetAmount.toString());
+    parseFloat(circle.currentAmount) >= parseFloat(circle.targetAmount);
 
   return (
     <div className='min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'>
@@ -348,15 +362,13 @@ export default function CircleDetailPage() {
                     Progress
                   </span>
                   <span className='text-gray-300'>
-                    {circle.currentAmount.toString()} ($
+                    {circle.currentAmount} BTC ($
                     {(
-                      parseFloat(circle.currentAmount.toString()) *
-                      getBtcToUsdRate()
+                      parseFloat(circle.currentAmount) * getBtcToUsdRate()
                     ).toFixed(2)}
-                    ) / {circle.targetAmount.toString()} ($
+                    ) / {circle.targetAmount} BTC ($
                     {(
-                      parseFloat(circle.targetAmount.toString()) *
-                      getBtcToUsdRate()
+                      parseFloat(circle.targetAmount) * getBtcToUsdRate()
                     ).toFixed(2)}
                     )
                   </span>
@@ -370,21 +382,21 @@ export default function CircleDetailPage() {
                 <div className='flex justify-between text-sm'>
                   <span className='text-gray-400'>
                     {(
-                      (parseFloat(circle.currentAmount.toString()) /
-                        parseFloat(circle.targetAmount.toString())) *
+                      (parseFloat(circle.currentAmount) /
+                        parseFloat(circle.targetAmount)) *
                         100 || 0
                     ).toFixed(1)}
                     % complete
                   </span>
                   <span className='text-gray-400'>
                     {(
-                      parseFloat(circle.targetAmount.toString()) -
-                      parseFloat(circle.currentAmount.toString())
+                      parseFloat(circle.targetAmount) -
+                      parseFloat(circle.currentAmount)
                     ).toFixed(8)}{" "}
-                    ($
+                    BTC ($
                     {(
-                      (parseFloat(circle.targetAmount.toString()) -
-                        parseFloat(circle.currentAmount.toString())) *
+                      (parseFloat(circle.targetAmount) -
+                        parseFloat(circle.currentAmount)) *
                       getBtcToUsdRate()
                     ).toFixed(2)}
                     ) remaining

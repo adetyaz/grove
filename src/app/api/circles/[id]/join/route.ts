@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { logUserActivity } from "@/lib/activity-logger";
+import { GROVE_CONTRACT_ADDRESS } from "@/lib/contracts";
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,7 +18,6 @@ export async function POST(request: NextRequest) {
       where: { id: circleId },
       include: {
         owner: true,
-        members: true,
       },
     });
 
@@ -35,12 +34,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
 
-    // Check if member is already in the circle
-    const isAlreadyMember = circle.members.some(
-      (m) => m.wallet.toLowerCase() === memberWallet.toLowerCase()
-    );
+    // Check if member is already in the circle by looking at UserActivity
+    const existingJoinActivity = await prisma.userActivity.findFirst({
+      where: {
+        userAddress: memberWallet,
+        type: "circle_joined",
+        metadata: {
+          contains: `"circleId":"${circleId}"`,
+        },
+      },
+    });
 
-    if (isAlreadyMember) {
+    if (existingJoinActivity) {
       return NextResponse.json({
         success: true,
         message: "Member already in circle",
@@ -48,67 +53,29 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Add member to the circle in database
-    await prisma.circle.update({
-      where: { id: circleId },
-      data: {
-        members: {
-          connect: { id: member.id },
-        },
-      },
-    });
-
-    // Log circle join activity
-    try {
-      await logUserActivity(
-        memberWallet,
-        "circle_joined",
-        `Joined savings circle "${circle.name}"`,
-        {
-          circleName: circle.name,
-          circleId: circle.id,
-        }
-      );
-    } catch (activityError) {
-      console.error("Error logging circle join activity:", activityError);
-      // Don't fail join if activity logging fails
-    }
-
-    // Send member joined notification
-    try {
-      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/send`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          event: "member_joined",
-          circleId,
-          data: {
-            memberWallet,
-          },
-        }),
-      });
-    } catch (notificationError) {
-      console.warn(
-        "⚠️ Failed to send member joined notification:",
-        notificationError
+    if (!circle.onChainId) {
+      return NextResponse.json(
+        { error: "Circle not deployed to blockchain yet" },
+        { status: 400 }
       );
     }
 
+    // Return the contract details for frontend to make the blockchain call
     return NextResponse.json({
       success: true,
-      message: "Member added to circle successfully",
-      member: {
-        id: member.id,
-        email: member.email,
-        name: member.name,
-        wallet: member.wallet,
-      },
+      requiresBlockchainTx: true,
+      contractAddress: GROVE_CONTRACT_ADDRESS,
+      onChainId: circle.onChainId,
+      memberWallet,
+      circleId,
+      circleName: circle.name,
+      message: "Ready to join circle on blockchain",
     });
   } catch (error) {
     console.error("❌ Error in member join:", error);
     return NextResponse.json(
       {
-        error: "Failed to join member to circle",
+        error: "Failed to prepare circle join",
         details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
