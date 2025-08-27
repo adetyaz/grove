@@ -66,13 +66,56 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
     targetAmount: "",
     contributionAmount: "",
     contributionInterval: "86400", // Default: daily (24 hours in seconds)
-    durationDays: "30", // Default: 30 days
+    durationDays: "30", // Auto-calculated, will be computed from other fields
     isPublic: false,
     // Legacy fields for database compatibility (will be converted)
     paymentType: 1, // Always recurring for V3
     frequency: "DAILY",
     hasDeadline: true,
   });
+
+  // Auto-calculate duration based on target amount, contribution amount, and interval
+  const calculateDuration = () => {
+    if (
+      !formData.targetAmount ||
+      !formData.contributionAmount ||
+      !formData.contributionInterval
+    ) {
+      return "30"; // Default fallback
+    }
+
+    const targetAmount = parseFloat(formData.targetAmount);
+    const contributionAmount = parseFloat(formData.contributionAmount);
+    const intervalSeconds = parseInt(formData.contributionInterval);
+
+    if (targetAmount <= 0 || contributionAmount <= 0 || intervalSeconds <= 0) {
+      return "30"; // Default fallback
+    }
+
+    // Calculate number of contributions needed
+    const contributionsNeeded = Math.ceil(targetAmount / contributionAmount);
+
+    // Calculate total duration in seconds
+    const totalDurationSeconds = contributionsNeeded * intervalSeconds;
+
+    // Convert to days
+    const durationDays = Math.ceil(totalDurationSeconds / 86400); // 86400 seconds = 1 day
+
+    return durationDays.toString();
+  };
+
+  // Update duration when target amount, contribution amount, or interval changes
+  useEffect(() => {
+    const newDuration = calculateDuration();
+    setFormData((prev) => ({
+      ...prev,
+      durationDays: newDuration,
+    }));
+  }, [
+    formData.targetAmount,
+    formData.contributionAmount,
+    formData.contributionInterval,
+  ]);
 
   useEffect(() => {
     if (hash) {
@@ -438,21 +481,14 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
 
             <div>
               <label className='block text-sm font-medium text-white mb-2'>
-                Duration (days) *
+                Duration (Auto-calculated)
               </label>
-              <input
-                type='number'
-                name='durationDays'
-                value={formData.durationDays}
-                onChange={handleInputChange}
-                placeholder='30'
-                min='1'
-                max='3650'
-                className='w-full px-4 py-2 bg-slate-800/50 border border-slate-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300'
-                required
-              />
+              <div className='w-full px-4 py-2 bg-slate-700/50 border border-slate-500 rounded-lg text-white backdrop-blur-sm'>
+                {formData.durationDays} days
+              </div>
               <p className='text-xs text-slate-400 mt-1'>
-                Min: 1 day • Max: 3650 days (10 years)
+                Automatically calculated based on target amount ÷ contribution
+                amount × interval
               </p>
             </div>
 

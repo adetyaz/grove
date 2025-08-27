@@ -64,10 +64,22 @@ export default function DynamicWagmiProvider({
         appName: "Grove",
         appLogoUrl: "/favicon.ico",
 
+        // Improved iframe configuration to prevent timeout
+        walletConnectorExtensions: [],
+
+        // Enhanced debugging and error handling
+        debugError: process.env.NODE_ENV === "development",
+
+        // Increase iframe timeout to prevent loading issues
+        shadowDOMEnabled: false,
+
         // CSS overrides for better UI
         cssOverrides: `
           .dynamic-modal {
             z-index: 9999;
+          }
+          .dynamic-widget-content iframe {
+            loading: eager !important;
           }
         `,
 

@@ -9,7 +9,6 @@ import InviteForm from "./invite-form";
 import InheritancePanel from "./inheritance-panel";
 
 import { formatBTCAmount, calculateProgress } from "@/lib/grove-contract";
-import { formatDeadline } from "@/hooks/useDashboardData";
 
 export default function CircleDashboard({
   dashboardData,
@@ -70,7 +69,17 @@ export default function CircleDashboard({
           );
           if (response.ok) {
             const data = await response.json();
+            console.log(`Contribution data for circle ${circle.id}:`, data);
             contributions[circle.id] = data.totalContributed || "0";
+          } else {
+            console.error(
+              `API response error for circle ${circle.id}:`,
+              response.status,
+              response.statusText
+            );
+            const errorData = await response.text();
+            console.error("Error response body:", errorData);
+            contributions[circle.id] = "0";
           }
         } catch (error) {
           console.error(
@@ -261,9 +270,7 @@ export default function CircleDashboard({
                       className={`text-sm ${
                         isExpired ? "text-red-400" : "text-gray-400"
                       }`}
-                    >
-                    
-                    </span>
+                    ></span>
                   </div>
                 </div>
 
