@@ -11,6 +11,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { Button } from "@/components/ui/button";
 import { groveToast } from "@/lib/toast";
+import { getBtcToUsdRate } from "@/lib/btc-conversion";
 
 function JoinPageContent() {
   const router = useRouter();
@@ -375,13 +376,25 @@ function JoinPageContent() {
               <div className='bg-gray-800/70 rounded-lg p-3 hover:bg-gray-800/90 transition-colors'>
                 <span className='block text-xs text-gray-400'>Target</span>
                 <span className='font-semibold text-green-300 text-sm sm:text-base'>
-                  {circle.targetAmount}
+                  {String(circle.targetAmount)} BTC
+                </span>
+                <span className='block text-xs text-gray-400'>
+                  $
+                  {(
+                    parseFloat(String(circle.targetAmount)) * getBtcToUsdRate()
+                  ).toFixed(2)}
                 </span>
               </div>
               <div className='bg-gray-800/70 rounded-lg p-3 hover:bg-gray-800/90 transition-colors'>
                 <span className='block text-xs text-gray-400'>Current</span>
                 <span className='font-semibold text-orange-300 text-sm sm:text-base'>
-                  {circle.currentAmount}
+                  {String(circle.currentAmount)} BTC
+                </span>
+                <span className='block text-xs text-gray-400'>
+                  $
+                  {(
+                    parseFloat(String(circle.currentAmount)) * getBtcToUsdRate()
+                  ).toFixed(2)}
                 </span>
               </div>
               <div className='bg-gray-800/70 rounded-lg p-3 hover:bg-gray-800/90 transition-colors'>

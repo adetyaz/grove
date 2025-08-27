@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import WalletConnection from "@/components/wallet-connection";
+import { getBtcToUsdRate } from "@/lib/btc-conversion";
 
 interface PublicCircle {
   id: string;
@@ -16,8 +17,13 @@ interface PublicCircle {
   targetAmount: string;
   contributionAmount: string;
   isPublic: boolean;
-  owner: string;
+  owner: {
+    name: string;
+    wallet: string;
+  };
   createdAt: string;
+  memberCount: number;
+  members?: string[];
 }
 
 export default function DiscoverPage() {
@@ -51,6 +57,16 @@ export default function DiscoverPage() {
       circle.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       circle.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const isUserMember = (circle: PublicCircle) => {
+    if (!primaryWallet?.address) return false;
+    return (
+      circle.members?.some(
+        (member) =>
+          member.toLowerCase() === primaryWallet.address?.toLowerCase()
+      ) || false
+    );
+  };
 
   if (!primaryWallet?.address) {
     return (
@@ -166,7 +182,11 @@ export default function DiscoverPage() {
                     <div className='flex items-center space-x-1'>
                       <Bitcoin className='w-4 h-4 text-orange-500' />
                       <span className='text-sm font-semibold text-white'>
-                        {circle.targetAmount} satoshis
+                        {circle.targetAmount} BTC ($
+                        {(
+                          parseFloat(circle.targetAmount) * getBtcToUsdRate()
+                        ).toFixed(2)}
+                        )
                       </span>
                     </div>
                   </div>
@@ -179,15 +199,20 @@ export default function DiscoverPage() {
                     <div className='flex items-center space-x-1'>
                       <Bitcoin className='w-4 h-4 text-orange-500' />
                       <span className='text-sm font-semibold text-white'>
-                        {circle.contributionAmount} satoshis
+                        {circle.contributionAmount} BTC ($
+                        {(
+                          parseFloat(circle.contributionAmount) *
+                          getBtcToUsdRate()
+                        ).toFixed(2)}
+                        )
                       </span>
                     </div>
                   </div>
 
                   {/* Owner */}
                   <div className='text-xs text-slate-500'>
-                    Created by {circle.owner?.slice(0, 6)}...
-                    {circle.owner?.slice(-4)}
+                    Created by {circle.owner?.wallet?.slice(0, 6)}...
+                    {circle.owner?.wallet?.slice(-4)}
                   </div>
 
                   {/* Created Date */}
@@ -195,15 +220,24 @@ export default function DiscoverPage() {
                     Created {new Date(circle.createdAt).toLocaleDateString()}
                   </div>
 
-                  {/* Join Button */}
-                  <Button
-                    className='w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold'
-                    onClick={() => {
-                      window.location.href = `/circles/${circle.id}`;
-                    }}
-                  >
-                    Join Circle
-                  </Button>
+                  {/* Join Button or Member Status */}
+                  {isUserMember(circle) ? (
+                    <Button
+                      className='w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold cursor-default'
+                      disabled
+                    >
+                      ✓ Already a Member
+                    </Button>
+                  ) : (
+                    <Button
+                      className='w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold'
+                      onClick={() => {
+                        window.location.href = `/circles/${circle.id}`;
+                      }}
+                    >
+                      Join Circle
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ))

@@ -12,6 +12,7 @@ import ContributionHistory from "@/components/contribution-history";
 import VotingPanel from "@/components/voting-panel";
 
 import { groveToast } from "@/lib/toast";
+import { getBtcToUsdRate } from "@/lib/btc-conversion";
 import {
   ArrowLeft,
   Users,
@@ -26,7 +27,6 @@ import {
   TrendingUp,
   DollarSign,
   Award,
-  Gift,
 } from "lucide-react";
 
 interface CircleData {
@@ -63,15 +63,15 @@ interface CircleData {
 export default function CircleDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { user, primaryWallet } = useDynamicConnection();
   const [circle, setCircle] = useState<CircleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isJoining, setIsJoining] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showContributeModal, setShowContributeModal] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "members" | "activity" | "gifts" | "voting"
+    "overview" | "members" | "activity" | "voting"
   >("overview");
 
   const circleId = params.id as string;
@@ -80,19 +80,6 @@ export default function CircleDetailPage() {
   const address = primaryWallet?.address;
 
   useEffect(() => {
-    const tab = searchParams.get("tab");
-    if (tab === "gift" || tab === "gifts") {
-      setActiveTab("gifts");
-    }
-  }, [searchParams]);
-
-  useEffect(() => {
-    // Temporarily disabled to test navigation
-    // if (!isConnected) {
-    //   router.push("/");
-    //   return;
-    // }
-
     const fetchCircleData = async () => {
       try {
         setLoading(true);
@@ -131,19 +118,44 @@ export default function CircleDetailPage() {
     }
   };
 
-  const formatBTCAmount = (amount: bigint | string) => {
-    const n = typeof amount === "string" ? BigInt(amount) : amount;
-    return `${(Number(n) / 1e18).toFixed(6)} BTC`;
-  };
+  const handleJoinCircle = async () => {
+    if (!address) {
+      groveToast.error("Please connect your wallet first");
+      return;
+    }
 
-  const calculateProgress = (
-    current: bigint | string,
-    target: bigint | string
-  ) => {
-    const c = typeof current === "string" ? BigInt(current) : current;
-    const t = typeof target === "string" ? BigInt(target) : target;
-    if (t === BigInt(0)) return 0;
-    return (Number(c) / Number(t)) * 100;
+    setIsJoining(true);
+    try {
+      const response = await fetch(`/api/circles/${circleId}/join`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          circleId: circleId,
+          memberWallet: address,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        if (data.alreadyMember) {
+          groveToast.info("You're already a member of this circle");
+        } else {
+          groveToast.success("Successfully joined the circle!");
+          // Refresh the page to update member list
+          window.location.reload();
+        }
+      } else {
+        groveToast.error(data.error || "Failed to join circle");
+      }
+    } catch (error) {
+      console.error("Error joining circle:", error);
+      groveToast.error("Failed to join circle");
+    } finally {
+      setIsJoining(false);
+    }
   };
 
   const formatDeadline = (deadline: bigint | string) => {
@@ -186,6 +198,27 @@ export default function CircleDetailPage() {
     );
   }
 
+  if (!isConnected) {
+    return (
+      <div className='min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center'>
+        <Card className='max-w-md bg-white/10 backdrop-blur-sm border-white/20 animate-fade-in'>
+          <CardContent className='text-center p-8'>
+            <div className='w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4'>
+              <Wallet className='w-8 h-8 text-primary' />
+            </div>
+            <h3 className='text-xl font-bold text-white mb-2'>
+              Connect Your Wallet
+            </h3>
+            <p className='text-gray-300 mb-6'>
+              Please connect your wallet to view and interact with this circle.
+            </p>
+            <WalletButton className='w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-white transition-all duration-300' />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (error || !circle) {
     return (
       <div className='min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center'>
@@ -211,8 +244,16 @@ export default function CircleDetailPage() {
   }
 
   const isCreator = circle.creator.toLowerCase() === address?.toLowerCase();
-  const progress = calculateProgress(circle.currentAmount, circle.targetAmount);
-  const isGoalReached = circle.currentAmount >= circle.targetAmount;
+  const isMember = circle.members.some(
+    (member) => member.toLowerCase() === address?.toLowerCase()
+  );
+  const progress =
+    (parseFloat(circle.currentAmount.toString()) /
+      parseFloat(circle.targetAmount.toString())) *
+      100 || 0;
+  const isGoalReached =
+    parseFloat(circle.currentAmount.toString()) >=
+    parseFloat(circle.targetAmount.toString());
 
   return (
     <div className='min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'>
@@ -307,8 +348,17 @@ export default function CircleDetailPage() {
                     Progress
                   </span>
                   <span className='text-gray-300'>
-                    {formatBTCAmount(circle.currentAmount)} /{" "}
-                    {formatBTCAmount(circle.targetAmount)}
+                    {circle.currentAmount.toString()} ($
+                    {(
+                      parseFloat(circle.currentAmount.toString()) *
+                      getBtcToUsdRate()
+                    ).toFixed(2)}
+                    ) / {circle.targetAmount.toString()} ($
+                    {(
+                      parseFloat(circle.targetAmount.toString()) *
+                      getBtcToUsdRate()
+                    ).toFixed(2)}
+                    )
                   </span>
                 </div>
                 <div className='relative'>
@@ -319,18 +369,25 @@ export default function CircleDetailPage() {
                 </div>
                 <div className='flex justify-between text-sm'>
                   <span className='text-gray-400'>
-                    {progress.toFixed(1)}% complete
+                    {(
+                      (parseFloat(circle.currentAmount.toString()) /
+                        parseFloat(circle.targetAmount.toString())) *
+                        100 || 0
+                    ).toFixed(1)}
+                    % complete
                   </span>
                   <span className='text-gray-400'>
-                    {formatBTCAmount(
-                      (typeof circle.targetAmount === "string"
-                        ? BigInt(circle.targetAmount)
-                        : circle.targetAmount) -
-                        (typeof circle.currentAmount === "string"
-                          ? BigInt(circle.currentAmount)
-                          : circle.currentAmount)
-                    )}{" "}
-                    remaining
+                    {(
+                      parseFloat(circle.targetAmount.toString()) -
+                      parseFloat(circle.currentAmount.toString())
+                    ).toFixed(8)}{" "}
+                    ($
+                    {(
+                      (parseFloat(circle.targetAmount.toString()) -
+                        parseFloat(circle.currentAmount.toString())) *
+                      getBtcToUsdRate()
+                    ).toFixed(2)}
+                    ) remaining
                   </span>
                 </div>
               </div>
@@ -354,9 +411,16 @@ export default function CircleDetailPage() {
                 <div className='text-center p-4 bg-white/5 rounded-lg border border-white/10 transition-all duration-300 hover-lift'>
                   <DollarSign className='w-6 h-6 text-secondary mx-auto mb-2' />
                   <div className='text-lg font-bold text-white'>
-                    {formatBTCAmount(circle.currentAmount)}
+                    {circle.currentAmount.toString()}
                   </div>
-                  <div className='text-sm text-gray-400'>Raised</div>
+                  <div className='text-sm text-gray-400'>
+                    $
+                    {(
+                      parseFloat(circle.currentAmount.toString()) *
+                      getBtcToUsdRate()
+                    ).toFixed(2)}{" "}
+                    Raised
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -369,17 +433,39 @@ export default function CircleDetailPage() {
                 <CardTitle className='text-white'>Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className='space-y-3'>
+                {!isMember && !isCreator && (
+                  <Button
+                    onClick={handleJoinCircle}
+                    className='w-full bg-gradient-to-r from-trust to-trust/90 hover:from-trust/90 hover:to-trust text-white transition-all duration-300 hover-lift shadow-lg hover:shadow-trust/25'
+                    disabled={!circle.isActive || isJoining}
+                  >
+                    {isJoining ? (
+                      <>
+                        <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2'></div>
+                        Joining...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className='w-4 h-4 mr-2' />
+                        Join Circle
+                      </>
+                    )}
+                  </Button>
+                )}
+
                 <Button
                   onClick={() => setShowContributeModal(true)}
                   className='w-full bg-gradient-to-r from-secondary to-secondary/90 hover:from-secondary/90 hover:to-secondary text-white transition-all duration-300 hover-lift shadow-lg hover:shadow-secondary/25'
-                  disabled={!circle.isActive}
+                  disabled={!circle.isActive || (!isMember && !isCreator)}
                 >
                   <Wallet className='w-4 h-4 mr-2' />
-                  Contribute
+                  {!isMember && !isCreator
+                    ? "Join to Contribute"
+                    : "Contribute"}
                 </Button>
 
                 {/* Show different buttons based on payment type */}
-                {circle.paymentType === "RECURRING" ? (
+                {circle.paymentType === "RECURRING" && (
                   <Button
                     onClick={() => console.log("Claim feature coming soon")}
                     variant='outline'
@@ -388,16 +474,6 @@ export default function CircleDetailPage() {
                   >
                     <Award className='w-4 h-4 mr-2' />
                     Start Vote to Claim
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => console.log("Gift feature coming soon")}
-                    variant='outline'
-                    className='w-full border-pink-500 text-pink-400 hover:bg-pink-500 hover:text-white transition-all duration-300'
-                    disabled={!circle.isActive}
-                  >
-                    <Gift className='w-4 h-4 mr-2' />
-                    Send Gift
                   </Button>
                 )}
 
@@ -444,19 +520,13 @@ export default function CircleDetailPage() {
               { id: "overview", label: "Overview", icon: Target },
               { id: "members", label: "Members", icon: Users },
               { id: "activity", label: "Activity", icon: TrendingUp },
-              { id: "gifts", label: "Gifts", icon: Gift },
               { id: "voting", label: "Voting", icon: Award },
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() =>
                   setActiveTab(
-                    id as
-                      | "overview"
-                      | "members"
-                      | "activity"
-                      | "gifts"
-                      | "voting"
+                    id as "overview" | "members" | "activity" | "voting"
                   )
                 }
                 className={`flex items-center space-x-2 px-4 py-2 border-b-2 transition-all duration-300 hover-lift ${
@@ -502,7 +572,13 @@ export default function CircleDetailPage() {
                               Contribution Amount:
                             </span>
                             <span className='text-white'>
-                              {formatBTCAmount(circle.contributionAmount)}
+                              {circle.contributionAmount} ($
+                              {(
+                                parseFloat(
+                                  circle.contributionAmount.toString()
+                                ) * getBtcToUsdRate()
+                              ).toFixed(2)}
+                              )
                             </span>
                           </div>
                         )}
@@ -527,32 +603,50 @@ export default function CircleDetailPage() {
                         <div className='flex justify-between'>
                           <span className='text-gray-400'>Target Amount:</span>
                           <span className='text-white'>
-                            {formatBTCAmount(circle.targetAmount)}
+                            {circle.targetAmount.toString()} ($
+                            {(
+                              parseFloat(circle.targetAmount.toString()) *
+                              getBtcToUsdRate()
+                            ).toFixed(2)}
+                            )
                           </span>
                         </div>
                         <div className='flex justify-between'>
                           <span className='text-gray-400'>Current Amount:</span>
                           <span className='text-white'>
-                            {formatBTCAmount(circle.currentAmount)}
+                            {circle.currentAmount.toString()} ($
+                            {(
+                              parseFloat(circle.currentAmount.toString()) *
+                              getBtcToUsdRate()
+                            ).toFixed(2)}
+                            )
                           </span>
                         </div>
                         <div className='flex justify-between'>
                           <span className='text-gray-400'>Remaining:</span>
                           <span className='text-white'>
-                            {formatBTCAmount(
-                              (typeof circle.targetAmount === "string"
-                                ? BigInt(circle.targetAmount)
-                                : circle.targetAmount) -
-                                (typeof circle.currentAmount === "string"
-                                  ? BigInt(circle.currentAmount)
-                                  : circle.currentAmount)
-                            )}
+                            {(
+                              parseFloat(circle.targetAmount.toString()) -
+                              parseFloat(circle.currentAmount.toString())
+                            ).toFixed(8)}{" "}
+                            ($
+                            {(
+                              (parseFloat(circle.targetAmount.toString()) -
+                                parseFloat(circle.currentAmount.toString())) *
+                              getBtcToUsdRate()
+                            ).toFixed(2)}
+                            )
                           </span>
                         </div>
                         <div className='flex justify-between'>
                           <span className='text-gray-400'>Progress:</span>
                           <span className='text-green-400 font-semibold'>
-                            {progress.toFixed(1)}%
+                            {(
+                              (parseFloat(circle.currentAmount.toString()) /
+                                parseFloat(circle.targetAmount.toString())) *
+                                100 || 0
+                            ).toFixed(1)}
+                            %
                           </span>
                         </div>
                       </div>
@@ -632,25 +726,6 @@ export default function CircleDetailPage() {
           {activeTab === "activity" && (
             <div className='animate-fade-in'>
               <ContributionHistory />
-            </div>
-          )}
-
-          {activeTab === "gifts" && (
-            <div className='animate-fade-in'>
-              <Card className='bg-white/10 backdrop-blur-sm border-white/20'>
-                <CardContent className='p-8 text-center'>
-                  <div className='w-16 h-16 bg-pink-500/20 rounded-full flex items-center justify-center mx-auto mb-4'>
-                    <Gift className='w-8 h-8 text-pink-400' />
-                  </div>
-                  <h3 className='text-xl font-bold text-white mb-2'>
-                    Gifts Feature
-                  </h3>
-                  <p className='text-gray-300'>
-                    Gift functionality coming soon! Send special gifts to circle
-                    members.
-                  </p>
-                </CardContent>
-              </Card>
             </div>
           )}
 
