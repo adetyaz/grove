@@ -111,7 +111,7 @@ export default function OverviewPage() {
       {/* Welcome Card - Full Width */}
       <Card className='bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 border-none text-white overflow-hidden relative'>
         <div className='absolute inset-0 bg-gradient-to-br from-black/20 to-transparent' />
-        <CardContent className='p-8 relative z-10'>
+        <CardContent className='p-4 relative z-10'>
           <div className='flex items-center space-x-6'>
             {/* Profile Avatar */}
             <div className='relative'>
@@ -157,7 +157,7 @@ export default function OverviewPage() {
             {/* Decorative Elements */}
             <div className='hidden lg:block'>
               <div className='w-32 h-32 bg-white/10 rounded-full flex items-center justify-center'>
-                <TrendingUp className='w-16 h-16 text-white/80' />
+                <TrendingUp className='w-8 h-8 text-white/80' />
               </div>
             </div>
           </div>
