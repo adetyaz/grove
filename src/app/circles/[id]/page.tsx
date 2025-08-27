@@ -87,10 +87,11 @@ export default function CircleDetailPage() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!isConnected) {
-      router.push("/");
-      return;
-    }
+    // Temporarily disabled to test navigation
+    // if (!isConnected) {
+    //   router.push("/");
+    //   return;
+    // }
 
     const fetchCircleData = async () => {
       try {
