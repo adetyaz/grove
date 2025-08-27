@@ -234,6 +234,80 @@ export default function Home() {
       {/* Connected User Dashboard - Shows when wallet is connected */}
       <ConnectedUserSection />
 
+      {/* Call to Action Section */}
+      <section className='px-4 lg:px-8 py-12 lg:py-16'>
+        <div className='max-w-7xl mx-auto'>
+          <div className='bg-gradient-to-br from-primary/10 via-secondary/10 to-primary/10 border border-primary/20 rounded-2xl p-8 lg:p-12 text-center backdrop-blur-sm'>
+            <h2 className='text-3xl sm:text-4xl font-bold text-white mb-4'>
+              Ready to Start Your Bitcoin Journey?
+            </h2>
+            <p className='text-lg sm:text-xl text-gray-300 mb-8 max-w-3xl mx-auto'>
+              Join thousands growing their Bitcoin together. Create your own
+              savings circle or discover existing communities.
+            </p>
+
+            <div className='grid sm:grid-cols-2 gap-6 max-w-4xl mx-auto'>
+              {/* Create Circle CTA */}
+              <Card className='bg-white/5 backdrop-blur-sm border-white/10 hover:border-primary/30 transition-all duration-300 hover-lift'>
+                <CardContent className='p-6'>
+                  <div className='text-4xl mb-4'>🌱</div>
+                  <h3 className='text-xl font-bold text-white mb-3'>
+                    Create Your Circle
+                  </h3>
+                  <p className='text-gray-300 mb-6 text-sm'>
+                    Start a new savings circle with family, friends, or
+                    colleagues. Set goals, invite members, and grow together.
+                  </p>
+                  <Link href='/create' className='w-full'>
+                    <Button className='w-full bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/25'>
+                      🚀 Start Creating
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+
+              {/* Discover Circles CTA */}
+              <Card className='bg-white/5 backdrop-blur-sm border-white/10 hover:border-secondary/30 transition-all duration-300 hover-lift'>
+                <CardContent className='p-6'>
+                  <div className='text-4xl mb-4'>🔍</div>
+                  <h3 className='text-xl font-bold text-white mb-3'>
+                    Discover Circles
+                  </h3>
+                  <p className='text-gray-300 mb-6 text-sm'>
+                    Explore public savings circles and join communities that
+                    match your financial goals and interests.
+                  </p>
+                  <Link href='/dashboard/discover' className='w-full'>
+                    <Button
+                      variant='outline'
+                      className='w-full border-secondary text-secondary hover:bg-secondary hover:text-white shadow-lg shadow-secondary/25'
+                    >
+                      🌟 Explore Circles
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Additional Info */}
+            <div className='mt-8 flex flex-wrap justify-center items-center gap-6 text-sm text-gray-400'>
+              <div className='flex items-center space-x-2'>
+                <Shield className='w-4 h-4 text-primary' />
+                <span>Secure & Transparent</span>
+              </div>
+              <div className='flex items-center space-x-2'>
+                <Users className='w-4 h-4 text-secondary' />
+                <span>Community Driven</span>
+              </div>
+              <div className='flex items-center space-x-2'>
+                <Zap className='w-4 h-4 text-accent' />
+                <span>Bitcoin Native</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Development Testing - Only in dev mode */}
       {process.env.NODE_ENV === "development" && (
         <section className='px-4 lg:px-8 py-8'>
@@ -803,22 +877,6 @@ export default function Home() {
                 <li>
                   <Link href='#' className='hover:text-white transition-colors'>
                     Documentation
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href='#'
-                    className='hover:text-grove-premium transition-colors'
-                  >
-                    Discord
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href='#'
-                    className='hover:text-grove-trust transition-colors'
-                  >
-                    Telegram
                   </Link>
                 </li>
                 <li>
