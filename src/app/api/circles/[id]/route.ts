@@ -44,14 +44,11 @@ export async function GET(
         owner: {
           select: { id: true, email: true, name: true, wallet: true },
         },
-        members: {
-          select: { id: true, email: true, name: true, wallet: true },
-        },
         invitations: {
           where: { status: "ACCEPTED" },
           select: {
-            acceptedByWalletAddress: true,
-            acceptedByEmail: true,
+            inviterWallet: true,
+            recipientEmail: true,
             acceptedAt: true,
           },
         },
@@ -80,19 +77,22 @@ export async function GET(
       description: parseCircleDescription(circle.description),
       targetAmount: circle.targetAmount,
       currentAmount,
-      deadline: Math.floor(new Date(circle.deadline).getTime() / 1000),
-      paymentType: circle.paymentType,
-      frequency: circle.frequency,
-      fixedAmount: circle.fixedAmount,
+      deadline:
+        Math.floor(Date.now() / 1000) +
+        parseInt(circle.durationDays) * 24 * 60 * 60, // Calculate deadline from duration
+      paymentType: circle.isPublic ? "PUBLIC" : "PRIVATE", // Map isPublic to paymentType
+      frequency: circle.contributionInterval, // Use contributionInterval as frequency
+      contributionAmount: circle.contributionAmount,
       isActive: circle.syncStatus === "SYNCED",
       syncStatus: circle.syncStatus,
-      memberCount: circle.members.length + 1,
+      memberCount:
+        circle.invitations.filter((inv) => inv.acceptedAt).length + 1, // Owner + accepted invitations
       members: [
         circle.owner.wallet,
-        ...circle.members.map((m: { wallet: string }) => m.wallet),
+        // For now, just include owner since invitation system is not fully integrated
       ],
       creator: circle.owner.wallet,
-      contractAddress: circle.contractAddress,
+      contractAddress: circle.transactionHash, // Use transaction hash as contract reference
     };
 
     return NextResponse.json(circleData);

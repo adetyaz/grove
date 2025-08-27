@@ -41,10 +41,20 @@ interface DynamicWagmiProviderProps {
 export default function DynamicWagmiProvider({
   children,
 }: DynamicWagmiProviderProps) {
+  // Ensure environment ID is available
+  const environmentId = process.env.NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID;
+
+  if (!environmentId) {
+    console.error(
+      "Missing NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID environment variable"
+    );
+    return <div>Missing Dynamic Environment ID configuration</div>;
+  }
+
   return (
     <DynamicContextProvider
       settings={{
-        environmentId: process.env.NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID!,
+        environmentId: environmentId,
         walletConnectors: [EthereumWalletConnectors],
 
         // Authentication mode - connect and sign for full authentication

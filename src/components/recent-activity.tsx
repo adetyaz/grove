@@ -1,18 +1,51 @@
 "use client";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock, RefreshCw } from "lucide-react";
-import { useUserActivityLegacy, ActivityItem } from "@/hooks/useUserActivity";
 import { Button } from "@/components/ui/button";
+
+interface Activity {
+  id: string;
+  type: string;
+  description?: string;
+  metadata?: string;
+  timestamp: Date;
+}
 
 interface RecentActivityProps {
   userAddress: string;
 }
 
 export default function RecentActivity({ userAddress }: RecentActivityProps) {
-  const { activities, loading, error, refetchActivity } =
-    useUserActivityLegacy(userAddress);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const formatTimestamp = (timestamp: string) => {
+  const fetchActivities = useCallback(async () => {
+    if (!userAddress) return;
+
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/activity/user?address=${userAddress}`);
+      if (response.ok) {
+        const data = await response.json();
+        setActivities(data.activities || []);
+      }
+    } catch (error) {
+      console.error("Error fetching activities:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [userAddress]);
+
+  useEffect(() => {
+    fetchActivities();
+  }, [fetchActivities]);
+
+  const refetch = () => {
+    fetchActivities();
+  };
+
+  const formatTimestamp = (timestamp: Date | string) => {
     const date = new Date(timestamp);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -31,18 +64,28 @@ export default function RecentActivity({ userAddress }: RecentActivityProps) {
     });
   };
 
-  const getColorClass = (color: ActivityItem["color"]) => {
-    switch (color) {
-      case "primary":
-        return "text-primary";
-      case "secondary":
-        return "text-secondary";
-      case "accent":
-        return "text-accent";
-      case "trust":
-        return "text-trust";
-      default:
-        return "text-gray-400";
+  const getActivityDescription = (activity: Activity) => {
+    if (activity.description) return activity.description;
+
+    // Parse metadata to create description
+    try {
+      const metadata = activity.metadata ? JSON.parse(activity.metadata) : {};
+      switch (activity.type) {
+        case "contribution":
+          return `Contributed ${metadata.amount || "some"} BTC to ${
+            metadata.circleName || "a circle"
+          }`;
+        case "circle_created":
+          return `Created circle: ${metadata.circleName || "Unknown"}`;
+        case "circle_joined":
+          return `Joined circle: ${metadata.circleName || "Unknown"}`;
+        case "achievement_earned":
+          return `Earned achievement: ${metadata.achievementName || "Unknown"}`;
+        default:
+          return activity.type.replace("_", " ");
+      }
+    } catch {
+      return activity.type.replace("_", " ");
     }
   };
 
@@ -57,7 +100,7 @@ export default function RecentActivity({ userAddress }: RecentActivityProps) {
           <Button
             variant='ghost'
             size='sm'
-            onClick={refetchActivity}
+            onClick={refetch}
             disabled={loading}
             className='text-gray-400 hover:text-white p-1 h-8 w-8'
           >
@@ -70,19 +113,6 @@ export default function RecentActivity({ userAddress }: RecentActivityProps) {
           <div className='text-center py-6'>
             <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4'></div>
             <p className='text-gray-400'>Loading activity...</p>
-          </div>
-        ) : error ? (
-          <div className='text-center py-6'>
-            <Clock className='w-8 h-8 text-red-500 mx-auto mb-2' />
-            <p className='text-red-400 text-sm mb-2'>Failed to load activity</p>
-            <Button
-              variant='outline'
-              size='sm'
-              onClick={refetchActivity}
-              className='text-gray-400 hover:text-white border-gray-600'
-            >
-              Try Again
-            </Button>
           </div>
         ) : activities.length === 0 ? (
           <div className='text-center py-6'>
@@ -101,20 +131,20 @@ export default function RecentActivity({ userAddress }: RecentActivityProps) {
                 key={activity.id}
                 className='flex items-start space-x-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors duration-200'
               >
-                <div className={`text-lg ${getColorClass(activity.color)}`}>
-                  {activity.icon}
+                <div className='text-lg text-trust'>
+                  <Clock className='w-4 h-4' />
                 </div>
                 <div className='flex-1 min-w-0'>
                   <div className='flex items-center justify-between'>
                     <p className='text-white font-medium text-sm truncate'>
-                      {activity.title}
+                      {getActivityDescription(activity)}
                     </p>
                     <span className='text-xs text-gray-400 ml-2 whitespace-nowrap'>
                       {formatTimestamp(activity.timestamp)}
                     </span>
                   </div>
                   <p className='text-gray-300 text-xs mt-1 leading-relaxed'>
-                    {activity.description}
+                    {activity.type.replace("_", " ")}
                   </p>
                 </div>
               </div>

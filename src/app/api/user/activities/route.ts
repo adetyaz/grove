@@ -8,12 +8,15 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "20");
 
     if (!wallet) {
-      return NextResponse.json({ error: "Wallet address required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Wallet address required" },
+        { status: 400 }
+      );
     }
 
     const activities = await prisma.userActivity.findMany({
       where: {
-        userWallet: wallet,
+        userAddress: wallet,
       },
       orderBy: {
         timestamp: "desc",

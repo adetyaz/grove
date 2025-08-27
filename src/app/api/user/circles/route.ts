@@ -3,44 +3,70 @@ import { prisma } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const wallet = searchParams.get("wallet");
+    const searchParams = request.nextUrl.searchParams;
+    const walletAddress = searchParams.get("wallet");
 
-    if (!wallet) {
-      return NextResponse.json({ error: "Wallet address required" }, { status: 400 });
+    if (!walletAddress) {
+      return NextResponse.json(
+        { error: "Wallet address is required" },
+        { status: 400 }
+      );
     }
 
-    // Find circles where user is the owner
-    const ownedCircles = await prisma.circle.findMany({
+    console.log("Fetching circles for wallet:", walletAddress);
+
+    // Find the actual user by wallet address from the schema
+    const user = await prisma.user.findUnique({
+      where: { wallet: walletAddress },
+    });
+
+    if (!user) {
+      console.log("No user found for wallet:", walletAddress);
+      return NextResponse.json({ circles: [] });
+    }
+
+    console.log("Found user:", user.id, user.email);
+
+    // Get circles owned by this user
+    const circles = await prisma.circle.findMany({
       where: {
-        owner: {
-          wallet,
-        },
+        ownerId: user.id,
       },
       include: {
         owner: {
           select: {
-            name: true,
+            id: true,
             wallet: true,
+            email: true,
+            name: true,
+          },
+        },
+        invitations: {
+          select: {
+            recipientEmail: true,
+            status: true,
+            createdAt: true,
           },
         },
       },
+      orderBy: {
+        createdAt: "desc",
+      },
     });
 
-    // For now, we'll only return owned circles
-    // In production, you'd also fetch circles where the user is a member from the blockchain
-    const circlesWithStats = ownedCircles.map((circle) => ({
-      ...circle,
-      memberCount: Math.floor(Math.random() * 10) + 1, // Mock member count
-      currentAmount: (parseInt(circle.targetAmount) * (Math.random() * 0.8)).toString(), // Mock progress
-      isOwner: true,
-      status: Math.random() > 0.7 ? "completed" : "active", // Mock status
-    }));
+    console.log("Found circles:", circles.length);
 
-    return NextResponse.json({
-      circles: circlesWithStats,
-      total: circlesWithStats.length,
-    });
+    return NextResponse.json(
+      { circles },
+      {
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate, proxy-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
+        },
+      }
+    );
   } catch (error) {
     console.error("Error fetching user circles:", error);
     return NextResponse.json(

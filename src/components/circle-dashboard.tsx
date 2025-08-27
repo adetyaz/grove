@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { UserPlus } from "lucide-react";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import ContributeForm from "./contribute-form";
-import RecurringPaymentForm from "./recurring-payment-form";
+
 import InviteForm from "./invite-form";
 import InheritancePanel from "./inheritance-panel";
 
@@ -40,12 +40,6 @@ export default function CircleDashboard({
     paymentType: "ONETIME",
   });
 
-  const [recurringModal, setRecurringModal] = useState<{
-    isOpen: boolean;
-    circleId: string;
-    circleName: string;
-  }>({ isOpen: false, circleId: "", circleName: "" });
-
   const [inviteModal, setInviteModal] = useState<{
     isOpen: boolean;
     circleId: string;
@@ -58,31 +52,9 @@ export default function CircleDashboard({
     circleMembers: string[];
   }>({ isOpen: false, circleId: 0, circleMembers: [] });
 
-  const [userSchedules, setUserSchedules] = useState<any[]>([]);
   const [userContributions, setUserContributions] = useState<{
     [key: string]: string;
   }>({});
-
-  // Fetch user payment schedules
-  useEffect(() => {
-    const fetchUserSchedules = async () => {
-      if (!primaryWallet?.address) return;
-
-      try {
-        const response = await fetch(
-          `/api/payments/schedule?userAddress=${userAddress}`
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setUserSchedules(data.schedules || []);
-        }
-      } catch (error) {
-        console.error("Error fetching user schedules:", error);
-      }
-    };
-
-    fetchUserSchedules();
-  }, [primaryWallet?.address, userAddress]);
 
   // Fetch user's actual contributions for each circle
   useEffect(() => {
@@ -121,12 +93,6 @@ export default function CircleDashboard({
     const actualContribution = userContributions[circleId];
     if (actualContribution && actualContribution !== "0") {
       return actualContribution;
-    }
-
-    // If no actual contributions yet, fall back to scheduled amount
-    const schedule = userSchedules.find((s) => s.circleId === circleId);
-    if (schedule?.amount) {
-      return schedule.amount;
     }
 
     // Final fallback
@@ -296,7 +262,7 @@ export default function CircleDashboard({
                         isExpired ? "text-red-400" : "text-gray-400"
                       }`}
                     >
-                      {formatDeadline(circle.deadline)}
+                    
                     </span>
                   </div>
                 </div>
@@ -315,18 +281,6 @@ export default function CircleDashboard({
                     }}
                   >
                     Contribute
-                  </button>
-                  <button
-                    className='bg-gradient-to-r from-orange-500/20 to-orange-600/20 border border-orange-500/30 text-orange-300 py-2 px-3 rounded-lg text-sm font-medium hover:from-orange-500/30 hover:to-orange-600/30 transition-all duration-200'
-                    onClick={() => {
-                      setRecurringModal({
-                        isOpen: true,
-                        circleId: circle.id,
-                        circleName: circle.name,
-                      });
-                    }}
-                  >
-                    🔄 Auto Pay
                   </button>
                 </div>
 
@@ -349,7 +303,8 @@ export default function CircleDashboard({
                       setInheritancePanel({
                         isOpen: true,
                         circleId: circle.id,
-                        circleMembers: circle.members?.map((m: any) => m.address) || [],
+                        circleMembers:
+                          circle.members?.map((m: any) => m.address) || [],
                       });
                     }}
                   >
@@ -408,7 +363,8 @@ export default function CircleDashboard({
                       setInheritancePanel({
                         isOpen: true,
                         circleId: circle.id,
-                        circleMembers: circle.members?.map((m: any) => m.address) || [],
+                        circleMembers:
+                          circle.members?.map((m: any) => m.address) || [],
                       });
                     }}
                   >
@@ -454,14 +410,22 @@ export default function CircleDashboard({
 
       {/* Inheritance Panel */}
       {inheritancePanel.isOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-transparent max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-white">Inheritance Management</h2>
+        <div className='fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50'>
+          <div className='bg-transparent max-w-4xl w-full max-h-[90vh] overflow-y-auto'>
+            <div className='bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20'>
+              <div className='flex justify-between items-center mb-6'>
+                <h2 className='text-2xl font-bold text-white'>
+                  Inheritance Management
+                </h2>
                 <button
-                  onClick={() => setInheritancePanel({ isOpen: false, circleId: 0, circleMembers: [] })}
-                  className="text-white/60 hover:text-white text-xl"
+                  onClick={() =>
+                    setInheritancePanel({
+                      isOpen: false,
+                      circleId: 0,
+                      circleMembers: [],
+                    })
+                  }
+                  className='text-white/60 hover:text-white text-xl'
                 >
                   ✕
                 </button>
@@ -478,15 +442,6 @@ export default function CircleDashboard({
       {/* Circle Goal/Deadline Claim Modal - Removed for V3 */}
       {/* TODO: Implement new V3 circle claim functionality */}
 
-      {recurringModal.isOpen && (
-        <RecurringPaymentForm
-          circleId={recurringModal.circleId}
-          circleName={recurringModal.circleName}
-          onClose={() =>
-            setRecurringModal({ isOpen: false, circleId: "", circleName: "" })
-          }
-        />
-      )}
       {inviteModal.isOpen && (
         <InviteForm
           circleId={inviteModal.circleId}

@@ -108,7 +108,7 @@ export function useStreakTracking() {
         error: null,
       });
     }
-  }, [address, fetchStreak]);
+  }, [address]); // Remove fetchStreak from dependencies
 
   // Check if streak achievement should be awarded
   const checkStreakAchievement = useCallback(() => {

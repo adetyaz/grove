@@ -80,16 +80,13 @@ model CircleInvitation {
 // Cache blockchain events for dashboard/leaderboard
 model UserActivity {
   id              String   @id @default(uuid())
-  userWallet      String                        // User's wallet address
-  activityType    String                        // "contribution", "circle_joined", "circle_created"
-  circleId        String?                       // Related circle (if applicable)
-  amount          String?                       // Amount for contributions (BigInt as string)
-  transactionHash String?                       // Blockchain transaction hash
-  blockNumber     String?                       // Block number for ordering
+  userAddress     String                        // User's wallet address
+  type            String                        // "contribution", "circle_joined", "circle_created"
+  description     String?                       // Activity description
+  metadata        String?                       // Additional activity data as JSON string
   timestamp       DateTime @default(now())
-  metadata        Json?                         // Additional activity data
   
-  @@index([userWallet])
-  @@index([activityType])
+  @@index([userAddress])
+  @@index([type])
   @@index([timestamp])
 }

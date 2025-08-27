@@ -63,6 +63,12 @@ export default function Home() {
               How It Works
             </Link>
             <Link
+              href='/circles'
+              className='text-gray-300 hover:text-primary transition-colors'
+            >
+              Discover Circles
+            </Link>
+            <Link
               href='#security'
               className='text-gray-300 hover:text-primary transition-colors'
             >
@@ -144,6 +150,13 @@ export default function Home() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Security
+              </Link>
+              <Link
+                href='/circles'
+                className='text-gray-300 hover:text-primary transition-colors py-2'
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Discover Circles
               </Link>
               {connectionState.isConnected && (
                 <Link

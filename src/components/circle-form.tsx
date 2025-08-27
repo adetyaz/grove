@@ -1,5 +1,10 @@
 "use client";
-import { useAccount, useSwitchChain, useWriteContract } from "wagmi";
+import {
+  useAccount,
+  useSwitchChain,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+} from "wagmi";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import {
   CITREA_TESTNET,
@@ -7,9 +12,8 @@ import {
   GROVE_ABI,
 } from "@/lib/contracts";
 import { useState, useEffect } from "react";
-import { parseEther } from "viem";
+import { parseEther, decodeEventLog } from "viem";
 import { groveToast } from "@/lib/toast";
-import { formatBtcAmount } from "@/lib/btc-conversion";
 
 interface CircleFormProps {
   onSuccess?: () => void;
@@ -22,6 +26,20 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
   const address = primaryWallet?.address;
   const isConnected = !!(user && primaryWallet?.address);
 
+  // Mock BTC to USD rate (in production, fetch from API)
+  const BTC_TO_USD = 43250;
+
+  // Helper function to convert BTC to USD
+  const btcToUsd = (btcAmount: string) => {
+    const btc = parseFloat(btcAmount);
+    if (isNaN(btc) || btc === 0) return "$0.00";
+    const usd = btc * BTC_TO_USD;
+    return `$${usd.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+
   const {
     writeContractAsync,
     isPending,
@@ -32,9 +50,15 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
 
   const [hash, setHash] = useState<string | undefined>(undefined);
   const [isConfirming, setIsConfirming] = useState(false);
-  const [isConfirmed, setIsConfirmed] = useState(false);
-  const [isNavigating, setIsNavigating] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Wait for transaction receipt
+  const { data: receipt, error: receiptError } = useWaitForTransactionReceipt({
+    hash: hash as `0x${string}`,
+    query: {
+      enabled: !!hash,
+    },
+  });
 
   const [formData, setFormData] = useState({
     name: "",
@@ -59,59 +83,64 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
   useEffect(() => {
     if (writeError) {
       groveToast.error(`Transaction failed: ${writeError.message}`);
+      setIsCreating(false);
+      setIsConfirming(false);
     }
   }, [writeError]);
 
-  const handleInputChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: name === "paymentType" ? Number(value) : value,
-    }));
-  };
-
-  const createCircle = async () => {
-    if (!isConnected || !address) {
-      groveToast.error("Please connect your wallet first");
-      return;
-    }
-
-    if (!isOnCorrectNetwork) {
-      groveToast.error("Please switch to Citrea Testnet to create circles");
-      return;
-    }
-
-    setIsCreating(true);
-
-    try {
-      const targetAmountWei = parseEther(formData.targetAmount);
-      const contributionAmountWei = parseEther(formData.contributionAmount);
-      const durationDaysBigInt = BigInt(formData.durationDays);
-
-      // Validation
-      if (targetAmountWei <= 0) {
-        groveToast.error("Target amount must be greater than 0");
-        return;
-      }
-      if (contributionAmountWei <= 0) {
-        groveToast.error("Contribution amount must be greater than 0");
-        return;
-      }
-      if (durationDaysBigInt <= 0) {
-        groveToast.error("Duration must be greater than 0 days");
-        return;
-      }
-
+  useEffect(() => {
+    if (receiptError) {
+      groveToast.error(`Receipt error: ${receiptError.message}`);
+      setIsCreating(false);
       setIsConfirming(false);
-      setIsConfirmed(false);
+    }
+  }, [receiptError]);
 
-      groveToast.info("Creating circle in database...");
+  // Handle successful transaction receipt
+  useEffect(() => {
+    if (receipt && receipt.status === "success" && address && user) {
+      handleTransactionSuccess(receipt);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receipt, address, user]);
 
-      const dbResponse = await fetch("/api/circles", {
+  // Handle successful blockchain deployment
+  const handleTransactionSuccess = async (receipt: any) => {
+    try {
+      console.log("Transaction receipt:", receipt);
+      console.log("Receipt logs:", receipt.logs);
+
+      // Extract circle ID from event logs
+      let circleId = null;
+
+      for (const log of receipt.logs) {
+        try {
+          const decoded = decodeEventLog({
+            abi: GROVE_ABI,
+            data: log.data,
+            topics: log.topics,
+          });
+
+          if (decoded.eventName === "CircleCreated" && decoded.args) {
+            // CircleCreated event: circleId (indexed), owner (indexed), name, isPublic
+            // The args object has the properties directly accessible
+            circleId = (decoded.args as any).circleId;
+            console.log("Found CircleCreated event:", decoded.args);
+            console.log("Extracted circleId:", circleId);
+            break;
+          }
+        } catch {
+          // Skip logs that can't be decoded
+          continue;
+        }
+      }
+
+      if (!circleId) {
+        throw new Error("Circle ID not found in transaction logs");
+      }
+
+      // Save to database with blockchain data
+      const response = await fetch("/api/circles", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -119,30 +148,122 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
         body: JSON.stringify({
           name: formData.name,
           description: formData.description,
-          targetAmount: targetAmountWei.toString(),
-          ownerWallet: address,
-          ownerEmail: user?.email || `${address}@grove.temp`,
-          // Grove system fields
-          contributionAmount: contributionAmountWei.toString(),
+          targetAmount: formData.targetAmount,
+          contributionAmount: formData.contributionAmount,
           contributionInterval: formData.contributionInterval,
           durationDays: formData.durationDays,
           isPublic: formData.isPublic,
+          ownerWallet: address,
+          ownerEmail: user?.email || `${address}@wallet.local`,
+          onChainId: Number(circleId),
+          transactionHash: receipt.transactionHash,
+          chainId: CITREA_TESTNET.id,
         }),
       });
 
-      if (!dbResponse.ok) {
-        throw new Error("Failed to create circle in database");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to save circle to database");
       }
 
-      const dbData = await dbResponse.json();
-      const databaseCircleId = dbData.databaseId;
-
-      groveToast.info("Circle created in database, deploying to blockchain...");
-
+      groveToast.success("Circle deployed and saved successfully!");
+      setIsConfirming(false);
       setIsCreating(false);
 
+      if (onSuccess) {
+        onSuccess();
+      }
+
+      // Reset form
+      setFormData({
+        name: "",
+        description: "",
+        targetAmount: "",
+        contributionAmount: "",
+        contributionInterval: "86400",
+        durationDays: "30",
+        isPublic: false,
+        paymentType: 1,
+        frequency: "DAILY",
+        hasDeadline: true,
+      });
+    } catch (error: any) {
+      groveToast.error(`Failed to save circle: ${error.message}`);
+      setIsConfirming(false);
+      setIsCreating(false);
+    }
+  };
+
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
+    const { name, value, type } = e.target;
+
+    // Enhanced validation for amount fields
+    if (name === "targetAmount" || name === "contributionAmount") {
+      const numValue = parseFloat(value);
+
+      if (name === "targetAmount") {
+        // Target amount: 0.000001 - 10 BTC
+        if (numValue < 0.000001 && value !== "") return;
+        if (numValue > 10) return;
+      } else if (name === "contributionAmount") {
+        // Contribution amount: 0.000001 - 1 BTC
+        if (numValue < 0.000001 && value !== "") return;
+        if (numValue > 1) return;
+      }
+    }
+
+    if (name === "durationDays") {
+      const numValue = parseInt(value);
+      // Duration: 1 - 3650 days (10 years)
+      if (numValue < 1 && value !== "") return;
+      if (numValue > 3650) return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]:
+        type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+    }));
+  };
+
+  const handleSwitchNetwork = async () => {
+    try {
+      await switchChain({ chainId: CITREA_TESTNET.id });
+    } catch {
+      groveToast.error("Failed to switch network");
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isConnected || !address) {
+      groveToast.error("Please connect your wallet first");
+      return;
+    }
+
+    if (!isOnCorrectNetwork) {
+      groveToast.error("Please switch to Citrea Testnet");
+      return;
+    }
+
+    try {
+      setIsCreating(true);
+
+      // Convert amounts to wei
+      const targetAmountWei = parseEther(formData.targetAmount);
+      const contributionAmountWei = parseEther(formData.contributionAmount);
+      const durationDays = BigInt(formData.durationDays);
+      const intervalSeconds = BigInt(formData.contributionInterval);
+
+      groveToast.info("Deploying circle to blockchain...");
+
+      // Create circle on blockchain
       const txHash = await writeContractAsync({
-        address: GROVE_CONTRACT_ADDRESS,
+        address: GROVE_CONTRACT_ADDRESS as `0x${string}`,
         abi: GROVE_ABI,
         functionName: "createCircle",
         args: [
@@ -150,392 +271,236 @@ export default function CircleForm({ onSuccess }: CircleFormProps) {
           formData.description,
           targetAmountWei,
           contributionAmountWei,
-          BigInt(formData.contributionInterval),
-          BigInt(formData.durationDays),
+          intervalSeconds,
+          durationDays,
           formData.isPublic,
         ],
       });
 
       setHash(txHash);
       setIsConfirming(true);
-
-      groveToast.info("Transaction sent, waiting for confirmation...");
-
-      const maxRetries = 6;
-      let retryCount = 0;
-
-      const checkTransactionAndSync = async (): Promise<void> => {
-        try {
-          const syncResponse = await fetch(
-            `/api/transaction/${txHash}?databaseCircleId=${databaseCircleId}`
-          );
-
-          if (syncResponse.ok) {
-            const syncData = await syncResponse.json();
-            console.log("Sync response:", syncData);
-
-            if (syncData.synced && syncData.circleId) {
-              groveToast.success(
-                `Circle "${formData.name}" created successfully!`
-              );
-              setIsConfirmed(true);
-
-              setIsNavigating(true);
-
-              setFormData({
-                name: "",
-                description: "",
-                targetAmount: "",
-                contributionAmount: "",
-                contributionInterval: "86400",
-                durationDays: "30",
-                isPublic: false,
-                paymentType: 1,
-                frequency: "DAILY",
-                hasDeadline: true,
-              });
-
-              if (onSuccess) {
-                setTimeout(() => {
-                  onSuccess();
-                }, 1000);
-              }
-              return;
-            } else if (retryCount < maxRetries) {
-              retryCount++;
-
-              setTimeout(checkTransactionAndSync, 3000);
-              return;
-            } else {
-              throw new Error("Circle created but sync failed after retries");
-            }
-          } else if (syncResponse.status === 202) {
-            const errorData = await syncResponse.json();
-            console.log("Transaction not yet mined:", errorData);
-
-            if (retryCount < maxRetries) {
-              retryCount++;
-              console.log(
-                `Retry ${retryCount}/${maxRetries} - transaction not mined yet, waiting...`
-              );
-              groveToast.info(
-                "Transaction submitted, waiting for confirmation..."
-              );
-              setTimeout(checkTransactionAndSync, 4000);
-              return;
-            } else {
-              throw new Error(
-                "Transaction not confirmed after maximum retries"
-              );
-            }
-          } else {
-            throw new Error(`Sync API returned error: ${syncResponse.status}`);
-          }
-        } catch (error) {
-          console.error("Sync error:", error);
-          if (retryCount < maxRetries) {
-            retryCount++;
-            console.log(
-              `Retry ${retryCount}/${maxRetries} due to error:`,
-              error
-            );
-            setTimeout(checkTransactionAndSync, 3000);
-          } else {
-            setIsConfirming(false);
-            groveToast.warning(
-              "Circle created but sync failed - please refresh the page"
-            );
-          }
-        }
-      };
-
-      setTimeout(checkTransactionAndSync, 2000);
-    } catch (error) {
-      console.error("Circle creation error:", error);
-      groveToast.error(
-        "Failed to create circle. Please check your wallet and try again."
-      );
-      setIsConfirming(false);
-      setIsNavigating(false);
+      groveToast.info("Transaction sent! Waiting for confirmation...");
+    } catch (error: any) {
+      groveToast.error(`Deployment failed: ${error.message}`);
       setIsCreating(false);
+      setIsConfirming(false);
     }
   };
 
+  if (!isConnected) {
+    return (
+      <div className='bg-slate-800/80 backdrop-blur-sm rounded-xl p-8 text-center border border-slate-700/50'>
+        <h3 className='text-xl font-semibold text-white mb-4'>
+          Connect Your Wallet
+        </h3>
+        <p className='text-slate-400 mb-6'>
+          Please connect your wallet to create a contribution circle.
+        </p>
+      </div>
+    );
+  }
+
+  if (!isOnCorrectNetwork) {
+    return (
+      <div className='bg-slate-800/80 backdrop-blur-sm rounded-xl p-8 text-center border border-slate-700/50'>
+        <h3 className='text-xl font-semibold text-white mb-4'>
+          Switch to Citrea Testnet
+        </h3>
+        <p className='text-slate-400 mb-6'>
+          Please switch to Citrea Testnet to create a circle.
+        </p>
+        <button
+          onClick={handleSwitchNetwork}
+          className='px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 font-medium'
+        >
+          Switch Network
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className='space-y-6'>
-      {/* Network Check */}
-      {isConnected && !isOnCorrectNetwork && (
-        <div className='bg-primary/20 border border-primary/30 rounded-lg p-4 animate-fade-in'>
-          <div className='flex items-center justify-between'>
+    <div className='max-w-2xl mx-auto'>
+      <form onSubmit={handleSubmit} className='space-y-6'>
+        <div className='bg-slate-800/80 backdrop-blur-sm rounded-xl p-8 border border-slate-700/50'>
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+            <div className='md:col-span-2'>
+              <label className='block text-sm font-medium text-white mb-2'>
+                Circle Name *
+              </label>
+              <input
+                type='text'
+                name='name'
+                value={formData.name}
+                onChange={handleInputChange}
+                placeholder='My Savings Circle'
+                className='w-full px-4 py-2 bg-slate-800/50 border border-slate-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300'
+                required
+              />
+            </div>
+
+            <div className='md:col-span-2'>
+              <label className='block text-sm font-medium text-white mb-2'>
+                Description *
+              </label>
+              <textarea
+                name='description'
+                value={formData.description}
+                onChange={handleInputChange}
+                placeholder="Describe your circle's purpose and goals..."
+                rows={3}
+                className='w-full px-4 py-2 bg-slate-800/50 border border-slate-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300'
+                required
+              />
+            </div>
+
             <div>
-              <h3 className='text-sm font-medium text-primary'>
-                Switch to Citrea Testnet
-              </h3>
-              <p className='text-xs text-gray-300 mt-1'>
-                Grove circles are created on Citrea testnet. Please switch your
-                network to continue.
+              <label className='block text-sm font-medium text-white mb-2'>
+                Target Amount (BTC) *
+              </label>
+              <input
+                type='number'
+                name='targetAmount'
+                value={formData.targetAmount}
+                onChange={handleInputChange}
+                placeholder='1.0'
+                step='0.000001'
+                min='0.000001'
+                max='10'
+                className='w-full px-4 py-2 bg-slate-800/50 border border-slate-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300'
+                required
+              />
+              <div className='flex justify-between items-center mt-1'>
+                <p className='text-xs text-slate-400'>
+                  Min: 0.000001 BTC • Max: 10 BTC
+                </p>
+                {formData.targetAmount && (
+                  <p className='text-xs text-emerald-400 font-medium'>
+                    ≈ {btcToUsd(formData.targetAmount)}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className='block text-sm font-medium text-white mb-2'>
+                Contribution Amount (BTC) *
+              </label>
+              <input
+                type='number'
+                name='contributionAmount'
+                value={formData.contributionAmount}
+                onChange={handleInputChange}
+                placeholder='0.1'
+                step='0.000001'
+                min='0.000001'
+                max='1'
+                className='w-full px-4 py-2 bg-slate-800/50 border border-slate-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300'
+                required
+              />
+              <div className='flex justify-between items-center mt-1'>
+                <p className='text-xs text-slate-400'>
+                  Min: 0.000001 BTC • Max: 1 BTC per contribution
+                </p>
+                {formData.contributionAmount && (
+                  <p className='text-xs text-emerald-400 font-medium'>
+                    ≈ {btcToUsd(formData.contributionAmount)}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className='block text-sm font-medium text-white mb-2'>
+                Contribution Interval *
+              </label>
+              <select
+                name='contributionInterval'
+                value={formData.contributionInterval}
+                onChange={handleInputChange}
+                className='w-full px-4 py-2 bg-slate-800/50 border border-slate-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-white backdrop-blur-sm transition-all duration-300'
+                style={{
+                  colorScheme: "dark",
+                }}
+                required
+              >
+                <option value='86400' className='bg-slate-800 text-white'>
+                  Daily (24 hours)
+                </option>
+                <option value='604800' className='bg-slate-800 text-white'>
+                  Weekly (7 days)
+                </option>
+                <option value='2592000' className='bg-slate-800 text-white'>
+                  Monthly (30 days)
+                </option>
+              </select>
+            </div>
+
+            <div>
+              <label className='block text-sm font-medium text-white mb-2'>
+                Duration (days) *
+              </label>
+              <input
+                type='number'
+                name='durationDays'
+                value={formData.durationDays}
+                onChange={handleInputChange}
+                placeholder='30'
+                min='1'
+                max='3650'
+                className='w-full px-4 py-2 bg-slate-800/50 border border-slate-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300'
+                required
+              />
+              <p className='text-xs text-slate-400 mt-1'>
+                Min: 1 day • Max: 3650 days (10 years)
               </p>
             </div>
+
+            <div className='md:col-span-2'>
+              <label className='flex items-center space-x-3'>
+                <input
+                  type='checkbox'
+                  name='isPublic'
+                  checked={formData.isPublic}
+                  onChange={handleInputChange}
+                  className='w-4 h-4 text-primary bg-white/10 border-white/20 rounded focus:ring-primary focus:ring-2'
+                />
+                <span className='text-sm text-white'>
+                  Make this circle public (others can discover and join)
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div className='mt-8 pt-6 border-t border-slate-700/50'>
             <button
-              onClick={() => switchChain({ chainId: CITREA_TESTNET.id })}
-              className='px-3 py-1 bg-primary hover:bg-primary/90 text-white text-sm rounded transition-all duration-300 hover-lift'
+              type='submit'
+              disabled={isCreating || isPending || isConfirming}
+              className='w-full px-6 py-2 bg-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-medium text-base'
             >
-              Switch Network
+              {isCreating || isPending || isConfirming
+                ? "Creating Circle..."
+                : "Create Circle"}
             </button>
           </div>
-        </div>
-      )}
 
-      <div className='grid gap-6'>
-        <div>
-          <label className='block text-sm text-left font-medium text-white mb-2'>
-            Circle Name *
-          </label>
-          <input
-            type='text'
-            name='name'
-            value={formData.name}
-            onChange={handleInputChange}
-            placeholder='Family Emergency Fund'
-            className='w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300'
-            required
-          />
-        </div>
-
-        <div>
-          <label className='block text-sm text-left font-medium text-white mb-2'>
-            Description
-          </label>
-          <textarea
-            name='description'
-            value={formData.description}
-            onChange={handleInputChange}
-            placeholder='Describe the purpose of this savings circle...'
-            rows={3}
-            className='w-full p-4 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white placeholder-gray-400 backdrop-blur-sm resize-none transition-all duration-300'
-          />
-        </div>
-
-        <div className='grid md:grid-cols-2 gap-4'>
-          <div>
-            <label className='block text-sm font-medium text-white mb-2'>
-              Target Amount (BTC) *
-            </label>
-            <input
-              type='number'
-              name='targetAmount'
-              value={formData.targetAmount}
-              onChange={handleInputChange}
-              placeholder='0.001'
-              step='0.0001'
-              min='0'
-              className='w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300'
-              required
-            />
-            {formData.targetAmount && parseFloat(formData.targetAmount) > 0 && (
-              <p className='text-xs text-gray-300 mt-1'>
-                ≈{" "}
-                {formatBtcAmount(formData.targetAmount, {
-                  showBoth: false,
-                  btcFirst: false,
-                })}
+          {hash && (
+            <div className='mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg'>
+              <p className='text-sm text-blue-400'>
+                Transaction hash:{" "}
+                <a
+                  href={`https://explorer.citrea.xyz/tx/${hash}`}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='underline hover:text-blue-300'
+                >
+                  {hash.slice(0, 10)}...{hash.slice(-8)}
+                </a>
               </p>
-            )}
-          </div>
-
-          <div>
-            <label className='block text-sm font-medium text-white mb-2'>
-              Contribution Amount per Payment (BTC) *
-            </label>
-            <input
-              type='number'
-              name='contributionAmount'
-              value={formData.contributionAmount}
-              onChange={handleInputChange}
-              placeholder='0.001'
-              step='0.0001'
-              min='0'
-              className='w-full p-4 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500'
-              required
-            />
-            {formData.contributionAmount &&
-              parseFloat(formData.contributionAmount) > 0 && (
-                <p className='text-xs text-gray-300 mt-1'>
-                  ≈{" "}
-                  {formatBtcAmount(formData.contributionAmount, {
-                    showBoth: false,
-                    btcFirst: false,
-                  })}{" "}
-                  per payment
-                </p>
-              )}
-          </div>
-
-          <div>
-            <label className='block text-sm font-medium text-white mb-2'>
-              Contribution Interval (seconds) *
-            </label>
-            <select
-              name='contributionInterval'
-              value={formData.contributionInterval}
-              onChange={handleInputChange}
-              className='w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500'
-              required
-            >
-              <option value='86400'>Daily (24 hours)</option>
-              <option value='604800'>Weekly (7 days)</option>
-              <option value='2592000'>Monthly (30 days)</option>
-            </select>
-          </div>
-
-          <div>
-            <label className='block text-sm font-medium text-white mb-2'>
-              Duration (days) *
-            </label>
-            <input
-              type='number'
-              name='durationDays'
-              value={formData.durationDays}
-              onChange={handleInputChange}
-              placeholder='30'
-              min='1'
-              className='w-full p-4 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500'
-              required
-            />
-            <p className='text-xs text-gray-300 mt-1'>
-              How long the circle will run (in days)
-            </p>
-          </div>
-
-          <div>
-            <label className='flex items-center text-white'>
-              <input
-                type='checkbox'
-                name='isPublic'
-                checked={formData.isPublic}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    isPublic: e.target.checked,
-                  }))
-                }
-                className='mr-2 text-purple-500 focus:ring-purple-500'
-              />
-              <span className='text-sm'>
-                Make this circle public (others can discover and join)
-              </span>
-            </label>
-          </div>
-        </div>
-
-        {/* Transaction Status */}
-        {isPending && (
-          <div className='bg-trust/20 border border-trust/30 rounded-lg p-4 animate-fade-in'>
-            <p className='text-trust text-sm'>
-              <strong>Transaction Pending:</strong> Please confirm the
-              transaction in your wallet...
-            </p>
-          </div>
-        )}
-
-        {isConfirming && (
-          <div className='bg-accent/20 border border-accent/30 rounded-lg p-4 animate-fade-in'>
-            <p className='text-accent text-sm'>
-              <strong>Confirming:</strong> Waiting for blockchain
-              confirmation...
-              {hash && (
-                <span className='block mt-1 text-xs'>
-                  Transaction: {hash.slice(0, 6)}...{hash.slice(-4)}
-                </span>
-              )}
-            </p>
-          </div>
-        )}
-
-        {isNavigating && (
-          <div className='bg-trust/20 border border-trust/30 rounded-lg p-4 animate-fade-in'>
-            <p className='text-trust text-sm'>
-              <strong>Success:</strong> Circle created! Redirecting to
-              dashboard...
-            </p>
-          </div>
-        )}
-
-        {/* Error Messages */}
-        {writeError && (
-          <div className='bg-red-500/20 border border-red-500/30 rounded-lg p-4 animate-fade-in'>
-            <p className='text-red-200 text-sm'>
-              <strong>Error:</strong> {writeError?.message}
-            </p>
-          </div>
-        )}
-
-        {/* Success Message */}
-        {isConfirmed && (
-          <div className='bg-secondary/20 border border-secondary/30 rounded-lg p-4 animate-fade-in'>
-            <p className='text-secondary text-sm'>
-              <strong>Success!</strong> Your circle has been created
-              successfully!
-              {hash && (
-                <span className='block mt-1 text-xs'>
-                  Transaction: {hash.slice(0, 6)}...{hash.slice(-4)}
-                </span>
-              )}
-            </p>
-          </div>
-        )}
-
-        <button
-          onClick={createCircle}
-          disabled={
-            isPending ||
-            isCreating ||
-            isConfirming ||
-            isNavigating ||
-            !isConnected ||
-            !isOnCorrectNetwork ||
-            !formData.name ||
-            !formData.targetAmount ||
-            !formData.contributionAmount
-          }
-          className='w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-white py-4 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-300 hover-lift disabled:hover:scale-100 shadow-lg hover:shadow-primary/25'
-        >
-          {isCreating ? (
-            <div className='flex items-center justify-center'>
-              <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2'></div>
-              Creating Circle...
-            </div>
-          ) : isPending ? (
-            <div className='flex items-center justify-center'>
-              <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2'></div>
-              Creating on Blockchain...
-            </div>
-          ) : isConfirming ? (
-            <div className='flex items-center justify-center'>
-              <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2'></div>
-              Confirming Transaction...
-            </div>
-          ) : isNavigating ? (
-            <div className='flex items-center justify-center'>
-              <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2'></div>
-              Redirecting to Dashboard...
-            </div>
-          ) : (
-            <div className='flex items-center justify-center'>
-              <span className='mr-2'>🌱</span>
-              Plant Your Circle
             </div>
           )}
-        </button>
-
-        {!isConnected && (
-          <div className='text-center p-4 bg-red-500/20 rounded-lg border border-red-500/30 animate-fade-in'>
-            <p className='text-sm text-red-200'>
-              ⚠️ Please connect your wallet to create a circle
-            </p>
-          </div>
-        )}
-      </div>
+        </div>
+      </form>
     </div>
   );
 }

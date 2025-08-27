@@ -3,10 +3,7 @@ import { prisma } from "@/lib/db";
 export interface StreakInfo {
   currentStreak: number;
   longestStreak: number;
-  lastActivityDate: Date | null;
-  daysUntilReset: number;
-  weeklyGoalProgress: number;
-  monthlyGoalProgress: number;
+  lastActivityDate: string | null;
 }
 
 export class StreakTracker {
@@ -17,7 +14,6 @@ export class StreakTracker {
   }
 
   async calculateCurrentStreak(): Promise<StreakInfo> {
-    // Get recent contribution activities (including recurring payments)
     const activities = await prisma.userActivity.findMany({
       where: {
         userAddress: this.userAddress,
@@ -28,7 +24,7 @@ export class StreakTracker {
       orderBy: {
         timestamp: "desc",
       },
-      take: 100, // Look at last 100 activities
+      take: 100,
     });
 
     if (activities.length === 0) {
@@ -36,133 +32,100 @@ export class StreakTracker {
         currentStreak: 0,
         longestStreak: 0,
         lastActivityDate: null,
-        daysUntilReset: 1,
-        weeklyGoalProgress: 0,
-        monthlyGoalProgress: 0,
       };
     }
 
-    // Calculate streak based on consecutive days with contributions
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
+    // Group activities by date (ignore time)
     const activityDates = new Set<string>();
     activities.forEach((activity) => {
-      const date = new Date(activity.timestamp);
-      date.setHours(0, 0, 0, 0);
-      activityDates.add(date.toISOString());
+      const date = new Date(activity.timestamp).toDateString();
+      activityDates.add(date);
     });
 
-    const sortedDates = Array.from(activityDates)
-      .map((date) => new Date(date))
-      .sort((a, b) => b.getTime() - a.getTime());
-
+    // Calculate current streak (consecutive days from today)
+    const today = new Date();
     let currentStreak = 0;
-    let longestStreak = 0;
-    let tempStreak = 0;
+    let checkDate = new Date(today);
 
-    // Check if user contributed today or yesterday (to maintain streak)
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+    // Check if there's activity today or yesterday to start the streak
+    const todayStr = today.toDateString();
+    const yesterdayStr = new Date(
+      today.getTime() - 24 * 60 * 60 * 1000
+    ).toDateString();
 
-    const hasContributedToday = sortedDates.some(
-      (date) => date.getTime() === today.getTime()
-    );
-    const hasContributedYesterday = sortedDates.some(
-      (date) => date.getTime() === yesterday.getTime()
-    );
+    if (activityDates.has(todayStr)) {
+      currentStreak = 1;
+      checkDate = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+    } else if (activityDates.has(yesterdayStr)) {
+      currentStreak = 1;
+      checkDate = new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000);
+    } else {
+      currentStreak = 0;
+    }
 
-    if (hasContributedToday || hasContributedYesterday) {
-      // Calculate current streak
-      let checkDate = hasContributedToday ? today : yesterday;
-
-      while (
-        sortedDates.some((date) => date.getTime() === checkDate.getTime())
-      ) {
+    // Continue checking consecutive days backwards
+    while (currentStreak > 0) {
+      const dateStr = checkDate.toDateString();
+      if (activityDates.has(dateStr)) {
         currentStreak++;
-        checkDate = new Date(checkDate);
-        checkDate.setDate(checkDate.getDate() - 1);
+        checkDate = new Date(checkDate.getTime() - 24 * 60 * 60 * 1000);
+      } else {
+        break;
       }
     }
 
-    // Calculate longest streak
-    let i = 0;
-    while (i < sortedDates.length) {
-      tempStreak = 1;
-      let currentDate = sortedDates[i];
+    // Calculate longest streak ever
+    const sortedDates = Array.from(activityDates)
+      .map((dateStr) => new Date(dateStr))
+      .sort((a, b) => a.getTime() - b.getTime());
 
-      for (let j = i + 1; j < sortedDates.length; j++) {
-        const nextDate = new Date(currentDate);
-        nextDate.setDate(nextDate.getDate() - 1);
+    let longestStreak = 1;
+    let tempStreak = 1;
 
-        if (sortedDates[j].getTime() === nextDate.getTime()) {
-          tempStreak++;
-          currentDate = sortedDates[j];
-        } else {
-          break;
-        }
+    for (let i = 1; i < sortedDates.length; i++) {
+      const prevDate = sortedDates[i - 1];
+      const currDate = sortedDates[i];
+      const daysDiff = Math.floor(
+        (currDate.getTime() - prevDate.getTime()) / (24 * 60 * 60 * 1000)
+      );
+
+      if (daysDiff === 1) {
+        tempStreak++;
+      } else {
+        longestStreak = Math.max(longestStreak, tempStreak);
+        tempStreak = 1;
       }
-
-      longestStreak = Math.max(longestStreak, tempStreak);
-      i += tempStreak;
     }
-
-    // Calculate days until streak reset
-    const daysUntilReset = hasContributedToday
-      ? 1
-      : hasContributedYesterday
-      ? 0
-      : -1;
-
-    // Calculate weekly and monthly progress
-    const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() - today.getDay()); // Start of week
-
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-
-    const weeklyContributions = activities.filter((activity) => {
-      const activityDate = new Date(activity.timestamp);
-      return activityDate >= weekStart;
-    }).length;
-
-    const monthlyContributions = activities.filter((activity) => {
-      const activityDate = new Date(activity.timestamp);
-      return activityDate >= monthStart;
-    }).length;
-
-    const weeklyGoalProgress = Math.min(weeklyContributions / 3, 1) * 100; // Goal: 3 per week
-    const monthlyGoalProgress = Math.min(monthlyContributions / 12, 1) * 100; // Goal: 12 per month
+    longestStreak = Math.max(longestStreak, tempStreak);
 
     return {
       currentStreak,
       longestStreak,
-      lastActivityDate: activities.length > 0 ? activities[0].timestamp : null,
-      daysUntilReset: Math.max(daysUntilReset, 0),
-      weeklyGoalProgress,
-      monthlyGoalProgress,
+      lastActivityDate: activities[0]?.timestamp.toISOString() || null,
     };
   }
 
   async updateUserStreak(): Promise<StreakInfo> {
     const streakInfo = await this.calculateCurrentStreak();
 
-    // Update user's streak information
+    // Update user's streak in database
     await prisma.user.upsert({
       where: { wallet: this.userAddress },
-      create: {
-        wallet: this.userAddress,
-        email: `${this.userAddress}@grove.temp`,
-        currentStreak: streakInfo.currentStreak,
-        longestStreak: streakInfo.longestStreak,
-        lastActivityDate: streakInfo.lastActivityDate,
-      },
       update: {
         currentStreak: streakInfo.currentStreak,
-        longestStreak: Math.max(
-          streakInfo.longestStreak,
-          streakInfo.currentStreak
-        ),
-        lastActivityDate: streakInfo.lastActivityDate,
+        longestStreak: streakInfo.longestStreak,
+        lastActivityDate: streakInfo.lastActivityDate
+          ? new Date(streakInfo.lastActivityDate)
+          : null,
+      },
+      create: {
+        wallet: this.userAddress,
+        email: `${this.userAddress}@temp.com`, // Temporary email
+        currentStreak: streakInfo.currentStreak,
+        longestStreak: streakInfo.longestStreak,
+        lastActivityDate: streakInfo.lastActivityDate
+          ? new Date(streakInfo.lastActivityDate)
+          : null,
       },
     });
 
@@ -175,25 +138,30 @@ export class StreakTracker {
     txHash?: string,
     isRecurring = false
   ): Promise<void> {
-    await prisma.userActivity.create({
-      data: {
-        userAddress: this.userAddress,
-        type: isRecurring ? "recurring_payment" : "contribution",
-        description: isRecurring
-          ? `Automatic recurring payment of ${amount} satoshis`
-          : `Contributed ${amount} satoshis`,
-        metadata: JSON.stringify({
-          circleId,
-          amount,
-          txHash,
-          isRecurring,
-        }),
-      },
-    });
+    // Record activity using raw SQL
+    await prisma.$executeRaw`
+      INSERT INTO "UserActivity" ("id", "userAddress", "type", "description", "metadata", "timestamp")
+      VALUES (${this.generateId()}, ${this.userAddress}, ${
+      isRecurring ? "recurring_payment" : "contribution"
+    }, ${
+      isRecurring
+        ? `Automatic recurring payment of ${amount} satoshis`
+        : `Contributed ${amount} satoshis`
+    }, ${JSON.stringify({
+      circleId,
+      amount,
+      txHash,
+      isRecurring,
+    })}, ${new Date()})
+    `;
 
     // Check for streak-based achievements
     const streakInfo = await this.updateUserStreak();
     await this.checkStreakAchievements(streakInfo);
+  }
+
+  private generateId(): string {
+    return `${Date.now()}_${Math.random().toString(36).substring(2)}`;
   }
 
   private async checkStreakAchievements(streakInfo: StreakInfo): Promise<void> {
@@ -232,19 +200,19 @@ export class StreakTracker {
 
     for (const milestone of milestones) {
       if (streakInfo.currentStreak === milestone.streak) {
-        // Log achievement
-        await prisma.userActivity.create({
-          data: {
-            userAddress: this.userAddress,
-            type: "achievement_earned",
-            description: `Earned achievement: ${milestone.name}`,
-            metadata: JSON.stringify({
-              achievementName: milestone.name,
-              achievementDescription: milestone.description,
-              streakLength: milestone.streak,
-            }),
-          },
-        });
+        // Log achievement using raw SQL
+        await prisma.$executeRaw`
+          INSERT INTO "UserActivity" ("id", "userAddress", "type", "description", "metadata", "timestamp")
+          VALUES (${this.generateId()}, ${
+          this.userAddress
+        }, ${"achievement_earned"}, ${`Earned achievement: ${milestone.name}`}, ${JSON.stringify(
+          {
+            achievementName: milestone.name,
+            achievementDescription: milestone.description,
+            streakLength: milestone.streak,
+          }
+        )}, ${new Date()})
+        `;
         break;
       }
     }
@@ -255,33 +223,24 @@ export class StreakTracker {
       userAddress: string;
       currentStreak: number;
       longestStreak: number;
-      totalContributions: number;
-      lastActivityDate: Date | null;
     }>
   > {
     const users = await prisma.user.findMany({
-      where: {
-        currentStreak: {
-          gt: 0,
-        },
-      },
-      orderBy: [{ currentStreak: "desc" }, { longestStreak: "desc" }],
-      take: limit,
       select: {
         wallet: true,
         currentStreak: true,
         longestStreak: true,
-        totalContributions: true,
-        lastActivityDate: true,
       },
+      orderBy: {
+        currentStreak: "desc",
+      },
+      take: limit,
     });
 
     return users.map((user) => ({
       userAddress: user.wallet,
       currentStreak: user.currentStreak,
       longestStreak: user.longestStreak,
-      totalContributions: user.totalContributions,
-      lastActivityDate: user.lastActivityDate,
     }));
   }
 }

@@ -25,19 +25,19 @@ export interface ActivityMetadata {
 }
 
 export async function logUserActivity(
-  userAddress: string,
+  userAddress: string, // User wallet address
   type: ActivityType,
   metadata?: ActivityMetadata
 ) {
   try {
     await prisma.userActivity.create({
       data: {
-        userWallet: userAddress.toLowerCase(),
-        activityType: type,
-        metadata: metadata || {},
+        userAddress: userAddress.toLowerCase(),
+        type: type,
+        metadata: JSON.stringify(metadata || {}),
       },
     });
-    console.log(`Activity logged: ${type} for ${userAddress}`);
+    console.log(`Activity logged: ${type} for user ${userAddress}`, metadata);
   } catch (error) {
     console.error("Failed to log user activity:", error);
   }
@@ -50,39 +50,12 @@ export async function logContribution(
   amount: string,
   txHash?: string
 ) {
-  await logUserActivity(
-    userAddress,
-    "contribution",
-    {
-      amount,
-      circleName,
-      circleId,
-      txHash,
-    }
-  );
-}
-
-export async function logGift(
-  senderAddress: string,
-  recipientAddress: string,
-  circleName: string,
-  circleId: string,
-  amount: string,
-  message?: string,
-  txHash?: string
-) {
-  await logUserActivity(
-    senderAddress,
-    "gift_sent",
-    {
-      amount,
-      circleName,
-      circleId,
-      recipient: recipientAddress,
-      message,
-      txHash,
-    }
-  );
+  await logUserActivity(userAddress, "contribution", {
+    amount,
+    circleName,
+    circleId,
+    txHash,
+  });
 }
 
 export async function logCircleCreation(
@@ -90,14 +63,10 @@ export async function logCircleCreation(
   circleName: string,
   circleId: string
 ) {
-  await logUserActivity(
-    userAddress,
-    "circle_created",
-    {
-      circleName,
-      circleId,
-    }
-  );
+  await logUserActivity(userAddress, "circle_created", {
+    circleName,
+    circleId,
+  });
 }
 
 export async function logCircleJoin(
@@ -105,14 +74,10 @@ export async function logCircleJoin(
   circleName: string,
   circleId: string
 ) {
-  await logUserActivity(
-    userAddress,
-    "circle_joined",
-    {
-      circleName,
-      circleId,
-    }
-  );
+  await logUserActivity(userAddress, "circle_joined", {
+    circleName,
+    circleId,
+  });
 }
 
 export async function logAchievement(
@@ -120,12 +85,8 @@ export async function logAchievement(
   achievementName: string,
   achievementId: string
 ) {
-  await logUserActivity(
-    userAddress,
-    "achievement",
-    {
-      achievementName,
-      achievementId,
-    }
-  );
+  await logUserActivity(userAddress, "achievement_earned", {
+    achievementName,
+    achievementId,
+  });
 }

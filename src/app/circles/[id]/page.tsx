@@ -11,7 +11,6 @@ import ContributeForm from "@/components/contribute-form";
 import ContributionHistory from "@/components/contribution-history";
 import VotingPanel from "@/components/voting-panel";
 
-
 import { groveToast } from "@/lib/toast";
 import {
   ArrowLeft,
@@ -44,7 +43,7 @@ interface CircleData {
   members: string[];
   creator: string;
   paymentType: string;
-  fixedAmount?: bigint;
+  contributionAmount?: bigint;
   createdAt: string;
   owner?: {
     id: string;
@@ -71,8 +70,6 @@ export default function CircleDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showContributeModal, setShowContributeModal] = useState(false);
-  const [showGiftModal, setShowGiftModal] = useState(false);
-  const [showClaimModal, setShowClaimModal] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "overview" | "members" | "activity" | "gifts" | "voting"
   >("overview");
@@ -383,7 +380,7 @@ export default function CircleDetailPage() {
                 {/* Show different buttons based on payment type */}
                 {circle.paymentType === "RECURRING" ? (
                   <Button
-                    onClick={() => setShowClaimModal(true)}
+                    onClick={() => console.log("Claim feature coming soon")}
                     variant='outline'
                     className='w-full border-green-500 text-green-400 hover:bg-green-500 hover:text-white transition-all duration-300'
                     disabled={!circle.isActive}
@@ -393,7 +390,7 @@ export default function CircleDetailPage() {
                   </Button>
                 ) : (
                   <Button
-                    onClick={() => setShowGiftModal(true)}
+                    onClick={() => console.log("Gift feature coming soon")}
                     variant='outline'
                     className='w-full border-pink-500 text-pink-400 hover:bg-pink-500 hover:text-white transition-all duration-300'
                     disabled={!circle.isActive}
@@ -453,7 +450,12 @@ export default function CircleDetailPage() {
                 key={id}
                 onClick={() =>
                   setActiveTab(
-                    id as "overview" | "members" | "activity" | "gifts" | "voting"
+                    id as
+                      | "overview"
+                      | "members"
+                      | "activity"
+                      | "gifts"
+                      | "voting"
                   )
                 }
                 className={`flex items-center space-x-2 px-4 py-2 border-b-2 transition-all duration-300 hover-lift ${
@@ -493,11 +495,13 @@ export default function CircleDetailPage() {
                               : "One-time"}
                           </span>
                         </div>
-                        {circle.fixedAmount && (
+                        {circle.contributionAmount && (
                           <div className='flex justify-between'>
-                            <span className='text-gray-400'>Fixed Amount:</span>
+                            <span className='text-gray-400'>
+                              Contribution Amount:
+                            </span>
                             <span className='text-white'>
-                              {formatBTCAmount(circle.fixedAmount)}
+                              {formatBTCAmount(circle.contributionAmount)}
                             </span>
                           </div>
                         )}
@@ -555,8 +559,6 @@ export default function CircleDetailPage() {
                   </div>
                 </CardContent>
               </Card>
-
-           
             </div>
           )}
 
@@ -643,7 +645,8 @@ export default function CircleDetailPage() {
                     Gifts Feature
                   </h3>
                   <p className='text-gray-300'>
-                    Gift functionality coming soon! Send special gifts to circle members.
+                    Gift functionality coming soon! Send special gifts to circle
+                    members.
                   </p>
                 </CardContent>
               </Card>
@@ -652,7 +655,7 @@ export default function CircleDetailPage() {
 
           {activeTab === "voting" && (
             <div className='animate-fade-in'>
-              <VotingPanel 
+              <VotingPanel
                 circleId={circle.id}
                 onChainId={circle.onChainId}
                 isOwner={isCreator}
@@ -663,8 +666,6 @@ export default function CircleDetailPage() {
               />
             </div>
           )}
-
-          
         </div>
       </div>
 
@@ -695,8 +696,6 @@ export default function CircleDetailPage() {
           }}
         />
       )}
-
-      
     </div>
   );
 }

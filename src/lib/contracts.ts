@@ -91,7 +91,7 @@ export interface Circle {
   targetAmount: bigint;
   currentAmount: bigint;
   paymentType: PaymentType;
-  fixedAmount: bigint;
+  contributionAmount: bigint;
   deadline: bigint;
   isActive: boolean;
   memberCount: number;
@@ -104,7 +104,7 @@ export interface CreateCircleParams {
   description: string;
   targetAmount: bigint;
   paymentType: PaymentType;
-  fixedAmount?: bigint;
+  contributionAmount?: bigint;
   deadline: bigint;
 }
 

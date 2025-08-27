@@ -29,14 +29,14 @@ export async function POST(
       args: [circleId, deceasedAddress, beneficiaryAddress],
     });
 
-    if (claimableAmount === 0n) {
+    if (claimableAmount === BigInt(0)) {
       return NextResponse.json({ error: "No inheritance to claim" }, { status: 400 });
     }
 
     // Return transaction data for frontend to execute
     return NextResponse.json({
       success: true,
-      claimableAmount: claimableAmount.toString(),
+      claimableAmount: (claimableAmount as bigint).toString(),
       transactionData: {
         contractAddress: INHERITANCE_CONTRACT_ADDRESS,
         functionName: "claimInheritance",
@@ -84,7 +84,7 @@ export async function GET(
     const [isActive, activatedAt, totalAmount, activatedBy, activationReason] = status;
 
     return NextResponse.json({
-      claimableAmount: claimableAmount.toString(),
+      claimableAmount: (claimableAmount as bigint).toString(),
       isActive,
       activatedAt: Number(activatedAt),
       totalAmount: totalAmount.toString(),

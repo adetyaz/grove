@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { NextRequest } from "next/server";
 import { logUserActivity } from "@/lib/activity-logger";
 
-// POST endpoint to store circle data BEFORE on-chain creation
+// POST endpoint to save circle data AFTER blockchain deployment
 export async function POST(req: NextRequest) {
   try {
     const {
@@ -11,12 +11,30 @@ export async function POST(req: NextRequest) {
       targetAmount,
       ownerWallet,
       ownerEmail,
-      // Grove system fields
       contributionAmount,
       contributionInterval,
       durationDays,
       isPublic,
+      // REQUIRED blockchain data
+      onChainId,
+      transactionHash,
     } = await req.json();
+
+    // Validate required blockchain data - must be real values
+    if (
+      !onChainId ||
+      !transactionHash ||
+      onChainId <= 0 ||
+      transactionHash.length < 10
+    ) {
+      return Response.json(
+        {
+          error:
+            "Circle must be deployed to blockchain first with valid onChainId and transactionHash",
+        },
+        { status: 400 }
+      );
+    }
 
     // First, ensure the user exists in database
     let user = await prisma.user.findUnique({
@@ -24,10 +42,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (!user) {
-      // Create user if they don't exist, always use the actual email from Dynamic
       if (!ownerEmail) {
-        throw new Error(
-          "Owner email is required and must be provided by Dynamic."
+        return Response.json(
+          { error: "Owner email is required for new users" },
+          { status: 400 }
         );
       }
       user = await prisma.user.create({
@@ -39,7 +57,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Create circle in database using Grove schema
+    // Create circle in database with blockchain data
     const circle = await prisma.circle.create({
       data: {
         name,
@@ -50,7 +68,9 @@ export async function POST(req: NextRequest) {
         durationDays: durationDays.toString(),
         isPublic: Boolean(isPublic),
         ownerId: user.id,
-        syncStatus: "PENDING",
+        onChainId: onChainId,
+        transactionHash: transactionHash,
+        syncStatus: "SYNCED", // Mark as synced since we have valid blockchain data
       },
       include: {
         owner: {
@@ -61,19 +81,14 @@ export async function POST(req: NextRequest) {
 
     // Log circle creation activity
     try {
-      await logUserActivity(
-        ownerWallet,
-        "circle_created",
-        `Created savings circle "${name}"`,
-        {
-          circleName: name,
-          circleId: circle.id,
-          targetAmount: targetAmount.toString(),
-          contributionAmount: contributionAmount.toString(),
-          durationDays: durationDays.toString(),
-          isPublic: Boolean(isPublic),
-        }
-      );
+      await logUserActivity(ownerWallet, "circle_created", {
+        circleName: name,
+        circleId: circle.id,
+        targetAmount: targetAmount.toString(),
+        contributionAmount: contributionAmount.toString(),
+        durationDays: durationDays.toString(),
+        isPublic: Boolean(isPublic),
+      });
     } catch (activityError) {
       console.error("Error logging circle creation activity:", activityError);
       // Don't fail circle creation if activity logging fails
@@ -118,23 +133,19 @@ export async function GET(req: NextRequest) {
       return Response.json({ circles: [] });
     }
 
-    // Find all circles where user is owner or member
+    // Find all circles where user is owner
     const circles = await prisma.circle.findMany({
       where: {
-        OR: [{ ownerId: user.id }, { members: { some: { id: user.id } } }],
+        ownerId: user.id,
       },
       include: {
         owner: {
           select: { id: true, email: true, name: true, wallet: true },
         },
-        members: {
-          select: { id: true, email: true, name: true, wallet: true },
-        },
         invitations: {
           where: { status: "ACCEPTED" },
           select: {
-            acceptedByWalletAddress: true,
-            acceptedByEmail: true,
+            recipientEmail: true,
             acceptedAt: true,
           },
         },
@@ -142,7 +153,17 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    return Response.json({ circles });
+    return Response.json(
+      { circles },
+      {
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate, proxy-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
+        },
+      }
+    );
   } catch (error) {
     console.error("Error fetching circles:", error);
     return Response.json({ error: "Failed to fetch circles" }, { status: 500 });

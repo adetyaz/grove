@@ -61,7 +61,8 @@ export default function StreakLeaderboard() {
   useEffect(() => {
     fetchLeaderboard();
     fetchUserStreak();
-  }, [fetchUserStreak]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address]); // Remove fetchUserStreak from dependencies to prevent infinite loop
 
   const formatAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;

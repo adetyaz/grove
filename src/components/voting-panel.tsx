@@ -1,14 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { useReadContract, useWriteContract } from "wagmi";
-import {
-  VOTING_CONTRACT_ADDRESS,
-  VOTING_ABI,
-  GROVE_CONTRACT_ADDRESS,
-  GROVE_ABI,
-} from "@/lib/contracts";
+import { VOTING_CONTRACT_ADDRESS, VOTING_ABI } from "@/lib/contracts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { groveToast } from "@/lib/toast";
@@ -21,7 +16,6 @@ import {
   DollarSign,
   MessageSquare,
   Plus,
-  Vote,
   Calendar,
 } from "lucide-react";
 
@@ -49,11 +43,10 @@ interface Proposal {
 }
 
 export default function VotingPanel({
-  circleId,
   onChainId,
   isOwner,
   onRefresh,
-}: VotingProps) {
+}: VotingProps): React.JSX.Element {
   const { primaryWallet } = useDynamicConnection();
   const address = primaryWallet?.address;
   const { writeContractAsync } = useWriteContract();
@@ -84,7 +77,11 @@ export default function VotingPanel({
     },
   });
 
-  const isVotingEnabled = votingConfig ? (votingConfig[0] as boolean) : false;
+  // Type the voting config properly
+  const typedVotingConfig = votingConfig as
+    | readonly [boolean, bigint, bigint, bigint, bigint]
+    | undefined;
+  const isVotingEnabled = typedVotingConfig ? typedVotingConfig[0] : false;
 
   // Enable voting for this circle (owner only)
   const enableVoting = async () => {
@@ -105,7 +102,7 @@ export default function VotingPanel({
       // Wait and refresh
       setTimeout(() => {
         refetchVotingConfig();
-        groveToast.transactionSuccess(txHash);
+        groveToast.transactionConfirmed(txHash);
       }, 5000);
     } catch (error: any) {
       groveToast.error(`Failed to enable voting: ${error.message}`);
@@ -210,7 +207,7 @@ export default function VotingPanel({
 
       setTimeout(() => {
         refetchProposals();
-        groveToast.transactionSuccess(txHash);
+        groveToast.transactionConfirmed(txHash);
       }, 5000);
     } catch (error: any) {
       groveToast.error(`Failed to vote: ${error.message}`);
@@ -235,7 +232,7 @@ export default function VotingPanel({
       setTimeout(() => {
         refetchProposals();
         onRefresh?.();
-        groveToast.transactionSuccess(txHash);
+        groveToast.transactionConfirmed(txHash);
       }, 5000);
     } catch (error: any) {
       groveToast.error(`Failed to execute proposal: ${error.message}`);
@@ -270,7 +267,7 @@ export default function VotingPanel({
     return {
       status: "active",
       label: "Active",
-      icon: <Vote className='w-4 h-4' />,
+      icon: <Clock className='w-4 h-4' />,
       color: "text-blue-400",
     };
   };
@@ -296,14 +293,14 @@ export default function VotingPanel({
         <Card className='bg-white/5 border-white/10'>
           <CardHeader>
             <CardTitle className='text-white flex items-center'>
-              <Vote className='w-5 h-5 mr-2' />
+              <Users className='w-5 h-5 mr-2' />
               Voting System
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className='text-center py-8'>
               <div className='w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4'>
-                <Vote className='w-8 h-8 text-blue-400' />
+                <Users className='w-8 h-8 text-blue-400' />
               </div>
               <h3 className='text-xl font-bold text-white mb-2'>
                 Enable Democratic Voting
@@ -332,7 +329,7 @@ export default function VotingPanel({
           <CardContent className='pt-6'>
             <div className='text-center py-8'>
               <div className='w-16 h-16 bg-gray-500/20 rounded-full flex items-center justify-center mx-auto mb-4'>
-                <Vote className='w-8 h-8 text-gray-400' />
+                <CheckCircle className='w-8 h-8 text-gray-400' />
               </div>
               <h3 className='text-xl font-bold text-white mb-2'>
                 Voting Not Enabled
@@ -352,10 +349,11 @@ export default function VotingPanel({
       {/* Voting Header */}
       <div className='flex items-center justify-between'>
         <div>
-          <h2 className='text-2xl font-bold text-white flex items-center'>
-            <Vote className='w-6 h-6 mr-2' />
-            Proposals & Voting
-          </h2>
+          <div className='flex items-center mb-2'>
+            <h2 className='text-2xl font-bold text-white'>
+              Proposals & Voting
+            </h2>
+          </div>
           <p className='text-gray-300'>
             Democratic decision making for circle funds
           </p>
@@ -370,7 +368,7 @@ export default function VotingPanel({
       </div>
 
       {/* Voting Configuration */}
-      {votingConfig && (
+      {typedVotingConfig && (
         <Card className='bg-white/5 border-white/10'>
           <CardHeader>
             <CardTitle className='text-white text-lg'>
@@ -382,25 +380,31 @@ export default function VotingPanel({
               <div>
                 <span className='text-gray-400 block'>Voting Period</span>
                 <span className='text-white font-mono'>
-                  {Math.floor(Number(votingConfig[1]) / 86400)} days
+                  {typedVotingConfig
+                    ? Math.floor(Number(typedVotingConfig[1]) / 86400)
+                    : 0}{" "}
+                  days
                 </span>
               </div>
               <div>
                 <span className='text-gray-400 block'>Quorum Required</span>
                 <span className='text-white font-mono'>
-                  {Number(votingConfig[2])}%
+                  {typedVotingConfig ? Number(typedVotingConfig[2]) : 0}%
                 </span>
               </div>
               <div>
                 <span className='text-gray-400 block'>Approval Required</span>
                 <span className='text-white font-mono'>
-                  {Number(votingConfig[3])}%
+                  {typedVotingConfig ? Number(typedVotingConfig[3]) : 0}%
                 </span>
               </div>
               <div>
                 <span className='text-gray-400 block'>Minimum Amount</span>
                 <span className='text-white font-mono'>
-                  {formatBtcAmount(votingConfig[4].toString())} BTC
+                  {typedVotingConfig
+                    ? formatBtcAmount(typedVotingConfig[4].toString())
+                    : "0.00000000"}{" "}
+                  BTC
                 </span>
               </div>
             </div>
@@ -653,7 +657,7 @@ function CreateProposalModal({
 
       setTimeout(() => {
         onSuccess();
-        groveToast.transactionSuccess(txHash);
+        groveToast.transactionConfirmed(txHash);
       }, 5000);
     } catch (error: any) {
       groveToast.error(`Failed to create proposal: ${error.message}`);
