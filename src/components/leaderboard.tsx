@@ -1,15 +1,14 @@
 "use client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trophy, Medal, Award, TrendingUp } from "lucide-react";
-import { formatBTCAmount } from "@/hooks/useDashboardData";
-import { useLeaderboard, LeaderboardEntry } from "@/hooks/useLeaderboard";
+import { useLeaderboard } from "@/hooks/useLeaderboard";
 
 interface LeaderboardProps {
   userAddress: string;
 }
 
 export default function Leaderboard({ userAddress }: LeaderboardProps) {
-  const { leaderboardData, loading, userRank } = useLeaderboard(userAddress);
+  const { leaderboardData, loading } = useLeaderboard(userAddress);
   const getRankIcon = (rank: number) => {
     switch (rank) {
       case 1:
@@ -100,7 +99,7 @@ export default function Leaderboard({ userAddress }: LeaderboardProps) {
                 </div>
                 <div className='text-right'>
                   <div className='font-bold text-white'>
-                    {formatBTCAmount(entry.totalContributed)}
+                    ${entry.totalContributed}
                   </div>
                   <div className='text-xs text-gray-400'>Total contributed</div>
                 </div>

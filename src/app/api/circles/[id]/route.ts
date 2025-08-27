@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { groveContract } from "@/lib/grove-contract";
+import { createPublicClient, http } from "viem";
+import { citreaTestnet } from "viem/chains";
+import { GROVE_CONTRACT_ADDRESS, GROVE_ABI } from "@/lib/contracts";
 
 // Utility function to parse circle description that might be JSON
 const parseCircleDescription = (description: string | null): string => {
@@ -58,44 +60,67 @@ export async function GET(
     if (!circle) {
       return NextResponse.json({ error: "Circle not found" }, { status: 404 });
     }
-    // Fetch current amount from blockchain if circle is synced
+    // Get real blockchain data if circle is deployed
     let currentAmount = "0";
-    try {
-      if (circle.onChainId) {
-        const blockchainData = await groveContract.getCircle(circle.onChainId);
-        currentAmount = blockchainData?.currentAmount?.toString() || "0";
+    let memberCount = 1; // Creator is always a member
+    let members: string[] = [circle.owner.wallet];
+
+    if (circle.onChainId) {
+      try {
+        const publicClient = createPublicClient({
+          chain: citreaTestnet,
+          transport: http(),
+        });
+
+        // Get circle data from blockchain (single call)
+        const circleData = (await publicClient.readContract({
+          address: GROVE_CONTRACT_ADDRESS,
+          abi: GROVE_ABI,
+          functionName: "getCircle",
+          args: [BigInt(circle.onChainId)],
+        })) as any[];
+
+        // Extract data from contract response
+        // Index 11 is members array
+        members = (circleData[11] as string[]) || [circle.owner.wallet];
+        memberCount = members.length;
+
+        // Current amount calculation - for now use 0
+        currentAmount = "0"; // TODO: Calculate from contributions
+      } catch (error) {
+        console.error(
+          `Error fetching blockchain data for circle ${circle.onChainId}:`,
+          error
+        );
+        // Keep default values if blockchain call fails
       }
-    } catch (error) {
-      console.error("Error fetching current amount from blockchain:", error);
     }
 
-    // Return circle data with UUID as ID
+    // Return circle data with proper format expected by frontend
     const circleData = {
       id: circle.id,
-      onChainId: circle.onChainId,
+      onChainId: circle.onChainId || 0,
       name: circle.name,
       description: parseCircleDescription(circle.description),
-      targetAmount: circle.targetAmount,
-      currentAmount,
-      deadline:
+      targetAmount: BigInt(circle.targetAmount),
+      currentAmount: BigInt(currentAmount),
+      deadline: BigInt(
         Math.floor(Date.now() / 1000) +
-        parseInt(circle.durationDays) * 24 * 60 * 60, // Calculate deadline from duration
-      paymentType: circle.isPublic ? "PUBLIC" : "PRIVATE", // Map isPublic to paymentType
-      frequency: circle.contributionInterval, // Use contributionInterval as frequency
-      contributionAmount: circle.contributionAmount,
+          parseInt(circle.durationDays) * 24 * 60 * 60
+      ),
       isActive: circle.syncStatus === "SYNCED",
       syncStatus: circle.syncStatus,
-      memberCount:
-        circle.invitations.filter((inv) => inv.acceptedAt).length + 1, // Owner + accepted invitations
-      members: [
-        circle.owner.wallet,
-        // For now, just include owner since invitation system is not fully integrated
-      ],
+      memberCount,
+      members,
       creator: circle.owner.wallet,
-      contractAddress: circle.transactionHash, // Use transaction hash as contract reference
+      paymentType: circle.isPublic ? "public" : "private",
+      contributionAmount: BigInt(circle.contributionAmount),
+      createdAt: circle.createdAt.toISOString(),
+      owner: circle.owner,
+      contributions: [], // TODO: Fetch real contributions from blockchain events
     };
 
-    return NextResponse.json(circleData);
+    return NextResponse.json({ circle: circleData });
   } catch (error) {
     console.error("Error fetching circle details:", error);
     return NextResponse.json(

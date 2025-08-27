@@ -58,13 +58,10 @@ export async function GET() {
             where: { wallet: address },
             include: {
               ownedCircles: true,
-              memberCircles: true,
             },
           });
 
-          const circlesCount = user
-            ? user.ownedCircles.length + user.memberCircles.length
-            : 0;
+          const circlesCount = user ? user.ownedCircles.length : 0;
 
           return {
             address,

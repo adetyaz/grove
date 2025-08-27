@@ -14,7 +14,6 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useState } from "react";
-import { formatBTCAmount } from "@/hooks/useDashboardData";
 
 interface EnhancedActivityFeedProps {
   userAddress: string;
@@ -81,7 +80,7 @@ export default function EnhancedActivityFeed({
         } else if (typeof amount === "number") {
           amount = Math.floor(amount * 100000000).toString();
         }
-        return `Contributed ${formatBTCAmount(BigInt(amount))} to ${
+        return `Contributed ${amount} satoshis to ${
           activity.metadata?.circleName || "a circle"
         }`;
       case "achievement":
@@ -100,7 +99,7 @@ export default function EnhancedActivityFeed({
         } else if (typeof giftAmount === "number") {
           giftAmount = Math.floor(giftAmount * 100000000).toString();
         }
-        return `Sent ${formatBTCAmount(BigInt(giftAmount))} gift to ${
+        return `Sent ${giftAmount} satoshis gift to ${
           activity.metadata?.recipient || "someone"
         }`;
       case "circle_created":

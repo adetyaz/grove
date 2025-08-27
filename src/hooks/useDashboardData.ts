@@ -53,17 +53,3 @@ export function useDashboardData() {
 }
 
 export const formatDeadline = () => "30 days";
-
-export const formatBTCAmount = (amount: any) => {
-  if (!amount) return "0.00000000";
-  const num = typeof amount === "string" ? parseFloat(amount) : amount;
-  return num.toFixed(8);
-};
-
-export const calculateProgress = (current: any, target: any) => {
-  if (!current || !target) return 0;
-  const currentNum =
-    typeof current === "string" ? parseFloat(current) : current;
-  const targetNum = typeof target === "string" ? parseFloat(target) : target;
-  return Math.min((currentNum / targetNum) * 100, 100);
-};

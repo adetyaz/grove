@@ -20,7 +20,6 @@ export async function GET(
       where: { wallet: address.toLowerCase() },
       include: {
         ownedCircles: true,
-        memberCircles: true,
       },
     });
 
@@ -38,30 +37,30 @@ export async function GET(
         try {
           const metadata = JSON.parse(activity.metadata);
           const amount = metadata.amount || "0";
-          
+
           // Handle both decimal strings and satoshi strings
-          if (typeof amount === 'string') {
-            if (amount.includes('.')) {
+          if (typeof amount === "string") {
+            if (amount.includes(".")) {
               // Convert decimal to satoshis
               const numAmount = parseFloat(amount);
-              totalContributedSatoshis += BigInt(Math.floor(numAmount * 100000000));
+              totalContributedSatoshis += BigInt(
+                Math.floor(numAmount * 100000000)
+              );
             } else {
               // Already in satoshis
               totalContributedSatoshis += BigInt(amount);
             }
-          } else if (typeof amount === 'number') {
+          } else if (typeof amount === "number") {
             // Convert from BTC to satoshis
             totalContributedSatoshis += BigInt(Math.floor(amount * 100000000));
           }
         } catch (error) {
-          console.warn('Error parsing activity metadata:', error);
+          console.warn("Error parsing activity metadata:", error);
         }
       }
     }
 
-    const circlesCount = user
-      ? user.ownedCircles.length + user.memberCircles.length
-      : 0;
+    const circlesCount = user ? user.ownedCircles.length : 0;
 
     return NextResponse.json({
       address,

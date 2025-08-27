@@ -20,7 +20,6 @@ export async function GET(request: NextRequest) {
       where: { wallet: address.toLowerCase() },
       include: {
         ownedCircles: true,
-        memberCircles: true,
       },
     });
 
@@ -71,14 +70,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const totalCircles = user.ownedCircles.length + user.memberCircles.length;
+    const totalCircles = user.ownedCircles.length; // Note: memberCircles not implemented yet
     const activeCircles = totalCircles;
 
     const currentStreak = Math.min(activeCircles, 7);
 
     const invitedMembers = await prisma.circleInvitation.count({
       where: {
-        inviterEmail: user.email,
+        inviterWallet: user.wallet,
         status: "ACCEPTED",
       },
     });

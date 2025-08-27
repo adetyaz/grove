@@ -166,7 +166,7 @@ export default function DiscoverPage() {
                     <div className='flex items-center space-x-1'>
                       <Bitcoin className='w-4 h-4 text-orange-500' />
                       <span className='text-sm font-semibold text-white'>
-                        {circle.targetAmount} BTC
+                        {circle.targetAmount} satoshis
                       </span>
                     </div>
                   </div>
@@ -179,7 +179,7 @@ export default function DiscoverPage() {
                     <div className='flex items-center space-x-1'>
                       <Bitcoin className='w-4 h-4 text-orange-500' />
                       <span className='text-sm font-semibold text-white'>
-                        {circle.contributionAmount} BTC
+                        {circle.contributionAmount} satoshis
                       </span>
                     </div>
                   </div>
@@ -199,13 +199,10 @@ export default function DiscoverPage() {
                   <Button
                     className='w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold'
                     onClick={() => {
-                      // For now, just show a message since we need blockchain integration
-                      alert(
-                        "Circle joining functionality requires blockchain integration"
-                      );
+                      window.location.href = `/circles/${circle.id}`;
                     }}
                   >
-                    View Circle
+                    Join Circle
                   </Button>
                 </CardContent>
               </Card>

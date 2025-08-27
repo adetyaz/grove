@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Users,
-  Target,
   Plus,
   MoreVertical,
   Wallet,
@@ -15,8 +14,6 @@ import {
   ExternalLink,
 } from "lucide-react";
 import {
-  formatBTCAmount,
-  calculateProgress,
   formatDeadline,
 } from "@/hooks/useDashboardData";
 import InviteForm from "./invite-form";
@@ -62,12 +59,10 @@ export default function CircleCard({
 
   const { writeContractAsync } = useWriteContract();
 
-  const progress = calculateProgress(circle.currentAmount, circle.targetAmount);
   const isCreator = circle.creator.toLowerCase() === userAddress.toLowerCase();
   const isMember = circle.members.some(
     (member) => member.toLowerCase() === userAddress.toLowerCase()
   );
-  const isGoalReached = circle.currentAmount >= circle.targetAmount;
 
   const handleJoinCircle = async () => {
     if (isJoining) return;
@@ -146,7 +141,7 @@ export default function CircleCard({
                 </span>
                 <span className='flex items-center'>
                   <Clock className='w-4 h-4 mr-1' />
-                  {formatDeadline(circle.deadline)}
+                  {formatDeadline()}
                 </span>
               </div>
             </div>
@@ -177,30 +172,17 @@ export default function CircleCard({
                 Progress
               </span>
               <span className='text-sm text-gray-400'>
-                {formatBTCAmount(circle.currentAmount)} /{" "}
-                {formatBTCAmount(circle.targetAmount)}
+                {circle.currentAmount.toString()} /{" "}
+                {circle.targetAmount.toString()} satoshis
               </span>
-            </div>
-            <div className='w-full bg-gray-700 rounded-full h-3'>
-              <div
-                className='bg-gradient-to-r from-green-500 to-green-600 h-3 rounded-full transition-all duration-300'
-                style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
-              />
             </div>
             <div className='flex justify-between items-center text-xs'>
               <span className='text-gray-400'>
-                {progress.toFixed(1)}% complete
+                Current: {circle.currentAmount.toString()}
               </span>
-              {isGoalReached ? (
-                <span className='text-green-400 font-medium'>
-                  🎉 Goal Reached!
-                </span>
-              ) : (
-                <span className='text-gray-400'>
-                  {formatBTCAmount(circle.targetAmount - circle.currentAmount)}{" "}
-                  remaining
-                </span>
-              )}
+              <span className='text-gray-400'>
+                Target: {circle.targetAmount.toString()}
+              </span>
             </div>
           </div>
 
@@ -293,12 +275,7 @@ export default function CircleCard({
 
           {/* Status Badge */}
           <div className='flex justify-center'>
-            {isGoalReached ? (
-              <span className='inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-500/20 text-green-300 border border-green-500/30'>
-                <Target className='w-4 h-4 mr-1' />
-                Goal Achieved
-              </span>
-            ) : circle.isActive ? (
+            {circle.isActive ? (
               <span className='inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-500/20 text-blue-600 border border-blue-500/30'>
                 <Plus className='w-4 h-4 mr-1' />
                 Active
@@ -337,7 +314,6 @@ export default function CircleCard({
             onUpdate?.();
           }}
           onContributionSuccess={onContributionSuccess}
-          onRefresh={onUpdate}
         />
       )}
     </>

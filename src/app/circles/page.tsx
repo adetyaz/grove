@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import WalletButton from "@/components/wallet-button";
+import { formatBtcAmount, getBtcToUsdRate } from "@/lib/btc-conversion";
 
 interface Circle {
   id: string;
@@ -70,24 +71,6 @@ export default function CirclesPage() {
       return response.json();
     },
   });
-
-  const formatBTC = (satoshis: string) => {
-    const btc = parseInt(satoshis) / 100000000;
-    return btc.toFixed(8);
-  };
-
-  const formatDuration = (days: string) => {
-    const numDays = parseInt(days);
-    if (numDays < 30) return `${numDays} days`;
-    if (numDays < 365) return `${Math.round(numDays / 30)} months`;
-    return `${Math.round(numDays / 365)} years`;
-  };
-
-  const getProgressPercentage = (current: string, target: string) => {
-    const currentAmount = parseInt(current);
-    const targetAmount = parseInt(target);
-    return Math.min((currentAmount / targetAmount) * 100, 100);
-  };
 
   const filteredCircles = circles?.circles || [];
 
@@ -236,7 +219,7 @@ export default function CirclesPage() {
         ) : (
           <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
             {filteredCircles.map((circle: Circle) => (
-              <Link key={circle.id} href={`/circles/${circle.onChainId}`}>
+              <Link key={circle.id} href={`/circles/${circle.id}`}>
                 <div className='bg-slate-800/30 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50 hover:border-emerald-500/50 hover:bg-slate-700/40 transition-all duration-200 cursor-pointer group'>
                   {/* Header */}
                   <div className='flex items-start justify-between mb-4'>
@@ -266,7 +249,11 @@ export default function CirclesPage() {
                         <span className='text-white/70 text-sm'>Target</span>
                       </div>
                       <span className='text-white font-medium'>
-                        {formatBTC(circle.targetAmount)} BTC
+                        {circle.targetAmount} BTC ($
+                        {(
+                          parseFloat(circle.targetAmount) * getBtcToUsdRate()
+                        ).toFixed(2)}
+                        )
                       </span>
                     </div>
 
@@ -275,18 +262,27 @@ export default function CirclesPage() {
                       <div className='flex justify-between text-sm mb-1'>
                         <span className='text-white/70'>Progress</span>
                         <span className='text-white'>
-                          {formatBTC(circle.currentAmount)} /{" "}
-                          {formatBTC(circle.targetAmount)} BTC
+                          {circle.currentAmount} / {circle.targetAmount} BTC
+                        </span>
+                      </div>
+                      <div className='flex justify-between text-sm mb-2'>
+                        <span className='text-white/70'>USD Value</span>
+                        <span className='text-white'>
+                          $
+                          {(
+                            parseFloat(circle.currentAmount) * getBtcToUsdRate()
+                          ).toFixed(2)}{" "}
+                          / $
+                          {(
+                            parseFloat(circle.targetAmount) * getBtcToUsdRate()
+                          ).toFixed(2)}
                         </span>
                       </div>
                       <div className='w-full bg-slate-700/50 rounded-full h-2'>
                         <div
                           className='bg-gradient-to-r from-emerald-500 to-emerald-600 h-2 rounded-full transition-all duration-300'
                           style={{
-                            width: `${getProgressPercentage(
-                              circle.currentAmount,
-                              circle.targetAmount
-                            )}%`,
+                            width: "0%", // No progress bar calculation
                           }}
                         ></div>
                       </div>
@@ -297,7 +293,7 @@ export default function CirclesPage() {
                       <div className='flex items-center gap-2'>
                         <Clock className='w-4 h-4 text-blue-400' />
                         <span className='text-slate-400 text-sm'>
-                          {formatDuration(circle.durationDays)}
+                          {circle.durationDays} days
                         </span>
                       </div>
                       <div className='flex items-center gap-2'>
