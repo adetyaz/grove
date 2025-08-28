@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       users.map(async (user, index) => {
         const normalizedWallet = user.wallet.toLowerCase();
 
-        // Get BTC contributions from UserActivity (convert from Wei)
+        // Get BTC contributions from UserActivity (use actual amounts)
         const contributions = await prisma.userActivity.findMany({
           where: {
             userAddress: {
@@ -62,10 +62,16 @@ export async function GET(request: NextRequest) {
           try {
             const metadata = JSON.parse(activity.metadata || "{}");
             if (metadata.amount) {
-              // Convert from Wei to BTC
-              const amountInWei = parseFloat(metadata.amount);
-              const amountInBTC = amountInWei / Math.pow(10, 18);
-              totalBTC += amountInBTC;
+              // Use the actual amount as stored (no conversion)
+              const amount = parseFloat(metadata.amount);
+              // Only convert if it's clearly in Wei (very large number)
+              if (amount > 1000000) {
+                // Convert from Wei to BTC
+                totalBTC += amount / Math.pow(10, 18);
+              } else {
+                // Use as-is (already in BTC)
+                totalBTC += amount;
+              }
             }
           } catch (error) {
             console.error("Error parsing contribution metadata:", error);
@@ -98,18 +104,18 @@ export async function GET(request: NextRequest) {
           },
         });
 
-        // Simple score calculation with reasonable numbers
+        // Simple score calculation with very reasonable numbers (max ~100 points)
         const score =
-          user.currentStreak * 10 +          // 10 points per streak day
-          totalBTC * 1000 +                  // 1000 points per BTC (so 1 BTC = 1000 points)
-          activeCirclesCount * 50 +          // 50 points per active circle
-          achievements.length * 25;          // 25 points per achievement
+          user.currentStreak * 2 +           // 2 points per streak day (max ~60 for 30 days)
+          totalBTC * 10 +                    // 10 points per BTC (so 0.01 BTC = 0.1 points)
+          activeCirclesCount * 5 +           // 5 points per active circle
+          achievements.length * 3;           // 3 points per achievement
 
         return {
           address: normalizedWallet,
           score: Math.round(score),
           rank: index + 1,
-          totalContributions: parseFloat(totalBTC.toFixed(8)), // Keep precision but readable
+          totalContributions: parseFloat(totalBTC.toFixed(6)), // Show 6 decimal places for BTC
           activeCircles: activeCirclesCount,
           achievements: achievements.length,
         };
