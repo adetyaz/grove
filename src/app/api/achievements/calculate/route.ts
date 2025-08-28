@@ -96,19 +96,16 @@ export async function POST(request: NextRequest) {
         })
       : 0;
 
-    // TODO: Fix when Prisma client is regenerated
     // Get existing achievements to avoid duplicates
-    // const existingAchievements = await prisma.userActivity.findMany({
-    //   where: {
-    //     userAddress: userAddress,
-    //     type: "achievement_earned",
-    //   },
-    //   select: {
-    //     metadata: true,
-    //   },
-    // });
-
-    const existingAchievements: any[] = []; // Temporary empty array
+    const existingAchievements = await prisma.userActivity.findMany({
+      where: {
+        userAddress: userAddress,
+        type: "achievement_earned",
+      },
+      select: {
+        metadata: true,
+      },
+    });
 
     const earnedAchievementIds = new Set();
     for (const existing of existingAchievements) {
@@ -205,25 +202,25 @@ export async function POST(request: NextRequest) {
     for (const achievement of achievements) {
       try {
         // TODO: Fix when Prisma client is regenerated
-        // await prisma.userActivity.create({
-        //   data: {
-        //     userAddress: userAddress,
-        //     type: "achievement_earned",
-        //     metadata: JSON.stringify({
-        //       achievementId: achievement.id,
-        //       achievementName: achievement.name,
-        //       achievementDescription: achievement.description,
-        //       achievementIcon: achievement.icon,
-        //       txHash,
-        //       earnedAt: new Date().toISOString(),
-        //       totalContributedBTC,
-        //       contributionCount,
-        //       totalCircles,
-        //       currentStreak,
-        //       invitationCount,
-        //     }),
-        //   },
-        // });
+        await prisma.userActivity.create({
+          data: {
+            userAddress: userAddress,
+            type: "achievement_earned",
+            metadata: JSON.stringify({
+              achievementId: achievement.id,
+              achievementName: achievement.name,
+              achievementDescription: achievement.description,
+              achievementIcon: achievement.icon,
+              txHash,
+              earnedAt: new Date().toISOString(),
+              totalContributedBTC,
+              contributionCount,
+              totalCircles,
+              currentStreak,
+              invitationCount,
+            }),
+          },
+        });
         console.log(
           `Achievement stored: ${achievement.name} for ${userAddress}`,
           {

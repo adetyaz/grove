@@ -14,6 +14,7 @@ import {
   Target,
   Zap,
 } from "lucide-react";
+import WalletButton from "@/components/wallet-button";
 
 interface LeaderboardEntry {
   address: string;
@@ -84,7 +85,9 @@ export default function LeaderboardPage() {
 
   const LeaderboardCard = ({ entry }: { entry: LeaderboardEntry }) => {
     const isCurrentUser =
-      address && entry.address.toLowerCase() === address.toLowerCase();
+      address &&
+      entry.address &&
+      entry.address.toLowerCase() === address.toLowerCase();
 
     return (
       <Card
@@ -107,13 +110,15 @@ export default function LeaderboardPage() {
                     </Badge>
                   )}
                 </div>
-                <p className='text-slate-400 text-sm'>Rank #{entry.rank}</p>
+                <p className='text-slate-400 text-sm'>
+                  Rank #{entry.rank || 0}
+                </p>
               </div>
             </div>
 
             <div className='text-right'>
               <p className='text-2xl font-bold text-white'>
-                {entry.score.toLocaleString()}
+                {(entry.score || 0).toLocaleString()}
               </p>
               <p className='text-slate-400 text-sm'>Grove Points</p>
             </div>
@@ -125,7 +130,7 @@ export default function LeaderboardPage() {
                 <Bitcoin className='w-4 h-4 text-orange-500' />
               </div>
               <p className='text-lg font-semibold text-white'>
-                {entry.totalContributions.toFixed(2)}
+                {(entry.totalContributions || 0).toFixed(2)}
               </p>
               <p className='text-xs text-slate-400'>Total BTC</p>
             </div>
@@ -135,7 +140,7 @@ export default function LeaderboardPage() {
                 <Users className='w-4 h-4 text-blue-500' />
               </div>
               <p className='text-lg font-semibold text-white'>
-                {entry.activeCircles}
+                {entry.activeCircles || 0}
               </p>
               <p className='text-xs text-slate-400'>Active Circles</p>
             </div>
@@ -145,7 +150,7 @@ export default function LeaderboardPage() {
                 <Trophy className='w-4 h-4 text-purple-500' />
               </div>
               <p className='text-lg font-semibold text-white'>
-                {entry.achievements}
+                {entry.achievements || 0}
               </p>
               <p className='text-xs text-slate-400'>Achievements</p>
             </div>
@@ -163,9 +168,14 @@ export default function LeaderboardPage() {
           <h2 className='text-2xl font-bold text-white mb-4'>
             Connect Your Wallet
           </h2>
-          <p className='text-slate-400'>
+          <p className='text-slate-400 mb-6'>
             Please connect your wallet to view the leaderboard.
           </p>
+          <WalletButton
+            variant='default'
+            size='lg'
+            className='bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600'
+          />
         </div>
       </div>
     );

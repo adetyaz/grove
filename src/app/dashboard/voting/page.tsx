@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { VOTING_CONTRACT_ADDRESS, VOTING_ABI } from "@/lib/contracts";
 import { groveToast } from "@/lib/toast";
+import WalletButton from "@/components/wallet-button";
 
 export default function VotingPage() {
   const { primaryWallet } = useDynamicConnection();
@@ -272,9 +273,14 @@ export default function VotingPage() {
           <h2 className='text-2xl font-bold text-white mb-4'>
             Connect Your Wallet
           </h2>
-          <p className='text-slate-400'>
+          <p className='text-slate-400 mb-6'>
             Please connect your wallet to participate in voting.
           </p>
+          <WalletButton 
+            variant="default"
+            size="lg"
+            className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+          />
         </div>
       </div>
     );

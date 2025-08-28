@@ -126,7 +126,6 @@ export default function CircleDetailPage() {
 
     setIsJoining(true);
     try {
-      // First, prepare the join on backend
       const response = await fetch(`/api/circles/${circleId}/join`, {
         method: "POST",
         headers: {
@@ -143,19 +142,9 @@ export default function CircleDetailPage() {
       if (response.ok) {
         if (data.alreadyMember) {
           groveToast.info("You're already a member of this circle");
-        } else if (data.requiresBlockchainTx) {
-          // Make the actual blockchain transaction
-          groveToast.info("Preparing blockchain transaction...");
-
-          // Call joinCircle on the smart contract
-          // Note: This would use wagmi's useWriteContract hook in practice
-          // For now, simulate the blockchain call
-
-          groveToast.success("Successfully joined the circle!");
-          // Refresh the page to update member list
-          window.location.reload();
         } else {
           groveToast.success("Successfully joined the circle!");
+          // Refresh the page to update member list
           window.location.reload();
         }
       } else {

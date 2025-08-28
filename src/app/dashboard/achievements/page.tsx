@@ -5,7 +5,25 @@ import { useDynamicConnection } from "@/hooks/useDynamicConnection";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, Lock, Star, Target, Users, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Trophy,
+  Lock,
+  Star,
+  Target,
+  Users,
+  Zap,
+  Coins,
+  DollarSign,
+  Gem,
+  Crown,
+  Flame,
+  Compass,
+  Medal,
+} from "lucide-react";
+import WalletButton from "@/components/wallet-button";
+import { useAchievementClaiming } from "@/hooks/useAchievementClaiming";
+import { groveToast } from "@/lib/toast";
 
 interface Achievement {
   id: string;
@@ -16,14 +34,17 @@ interface Achievement {
   progress: number;
   threshold: number;
   unlocked: boolean;
+  nftClaimed?: boolean;
 }
 
 export default function AchievementsPage() {
   const { primaryWallet } = useDynamicConnection();
   const address = primaryWallet?.address;
+  const { claimAchievement } = useAchievementClaiming();
 
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [claimingIds, setClaimingIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const fetchAchievements = async () => {
@@ -47,6 +68,65 @@ export default function AchievementsPage() {
 
     fetchAchievements();
   }, [address]);
+
+  const handleClaimAchievement = async (achievementId: number) => {
+    if (claimingIds.has(achievementId)) return;
+
+    setClaimingIds((prev) => new Set(prev).add(achievementId));
+
+    try {
+      await claimAchievement(achievementId);
+
+      // Refresh achievements to update NFT claimed status
+      const response = await fetch(`/api/user/achievements?address=${address}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAchievements(data.achievements || []);
+      }
+
+      groveToast.success("🎉 Achievement NFT claimed successfully!");
+    } catch (error) {
+      console.error("Error claiming achievement:", error);
+      groveToast.error("Failed to claim achievement NFT");
+    } finally {
+      setClaimingIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(achievementId);
+        return newSet;
+      });
+    }
+  };
+
+  const getAchievementIcon = (iconName: string) => {
+    switch (iconName) {
+      case "TARGET":
+        return <Target className='w-6 h-6' />;
+      case "COIN":
+        return <Coins className='w-6 h-6' />;
+      case "MONEY":
+        return <DollarSign className='w-6 h-6' />;
+      case "DIAMOND":
+        return <Gem className='w-6 h-6' />;
+      case "TROPHY":
+        return <Trophy className='w-6 h-6' />;
+      case "BUTTERFLY":
+        return <Users className='w-6 h-6' />;
+      case "NETWORK":
+        return <Users className='w-6 h-6' />;
+      case "CROWN":
+        return <Crown className='w-6 h-6' />;
+      case "FIRE":
+        return <Flame className='w-6 h-6' />;
+      case "LIGHTNING":
+        return <Zap className='w-6 h-6' />;
+      case "COMPASS":
+        return <Compass className='w-6 h-6' />;
+      case "MEDAL":
+        return <Medal className='w-6 h-6' />;
+      default:
+        return <Star className='w-6 h-6' />;
+    }
+  };
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -86,9 +166,14 @@ export default function AchievementsPage() {
           <h2 className='text-2xl font-bold text-white mb-4'>
             Connect Your Wallet
           </h2>
-          <p className='text-slate-400'>
+          <p className='text-slate-400 mb-6'>
             Please connect your wallet to view your achievements.
           </p>
+          <WalletButton
+            variant='default'
+            size='lg'
+            className='bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600'
+          />
         </div>
       </div>
     );
@@ -128,11 +213,13 @@ export default function AchievementsPage() {
           </CardHeader>
           <CardContent>
             <div className='text-2xl font-bold'>
-              {Math.round(
-                (achievements.filter((a) => a.unlocked).length /
-                  achievements.length) *
-                  100
-              )}
+              {achievements.length > 0
+                ? Math.round(
+                    (achievements.filter((a) => a.unlocked).length /
+                      achievements.length) *
+                      100
+                  )
+                : 0}
               %
             </div>
             <p className='text-xs text-blue-200'>Overall completion</p>
@@ -186,7 +273,7 @@ export default function AchievementsPage() {
                       }`}
                     >
                       {achievement.unlocked ? (
-                        <span className='text-2xl'>{achievement.icon}</span>
+                        getAchievementIcon(achievement.icon)
                       ) : (
                         <Lock className='w-6 h-6' />
                       )}
@@ -227,22 +314,47 @@ export default function AchievementsPage() {
                     <div className='flex items-center justify-between mb-2'>
                       <span className='text-sm text-slate-400'>Progress</span>
                       <span className='text-sm font-semibold text-white'>
-                        {achievement.progress}%
+                        {achievement.progress || 0}%
                       </span>
                     </div>
                     <Progress
-                      value={achievement.progress}
+                      value={achievement.progress || 0}
                       className='h-2 bg-slate-700'
                     />
                   </div>
                 )}
 
                 {achievement.unlocked && (
-                  <div className='flex items-center space-x-2 text-yellow-400'>
-                    <Trophy className='w-4 h-4' />
-                    <span className='text-sm font-medium'>
-                      Achievement Unlocked!
-                    </span>
+                  <div className='space-y-3'>
+                    <div className='flex items-center space-x-2 text-yellow-400'>
+                      <Trophy className='w-4 h-4' />
+                      <span className='text-sm font-medium'>
+                        Achievement Unlocked!
+                      </span>
+                    </div>
+
+                    {!achievement.nftClaimed ? (
+                      <Button
+                        onClick={() =>
+                          handleClaimAchievement(parseInt(achievement.id))
+                        }
+                        disabled={claimingIds.has(parseInt(achievement.id))}
+                        className='w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold'
+                      >
+                        {claimingIds.has(parseInt(achievement.id)) ? (
+                          <>
+                            <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2'></div>
+                            Claiming NFT...
+                          </>
+                        ) : (
+                          "🏆 Claim as NFT"
+                        )}
+                      </Button>
+                    ) : (
+                      <div className='text-center py-2 text-sm text-green-400'>
+                        ✅ NFT Claimed
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
